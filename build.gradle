@@ -1,0 +1,101 @@
+apply plugin: 'maven'
+apply plugin: 'maven-publish'
+apply plugin: 'java-library'
+
+group 'com.walnutcrasher.servercursemanager'
+
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
+
+repositories {
+    mavenCentral()
+    mavenLocal()
+    maven {
+        name = "forge"
+        url = "http://files.minecraftforge.net/maven"
+    }
+}
+project.version = "1.0.0"
+
+ext.forge_version = "34.1.10"
+
+ext.sharedManifest = manifest {
+    attributes(['Class-Path': 'forge.jar',
+     'Main-Class': 'net.minecraftforge.server.ServerMain',
+     'ServerLaunchArgs': "--gameDir . --launchTarget fmlserver --fml.forgeVersion ${forge_version} --fml.mcpVersion 20190829.143755 --fml.mcVersion 1.16.3 --fml.forgeGroup net.minecraftforge"
+    ],
+    )
+    attributes(
+            ["Specification-Title"     : "servercursemanager",
+             "Specification-Vendor"    : "walnutcrasher",
+             "Specification-Version"   : "1",
+             "Implementation-Title"    : project.name,
+             "Implementation-Vendor"   : "walnutcrasher",
+             "Implementation-Timestamp": new Date().format("yyyy-MM-dd'T'HH:mm:ssZ")],
+            "com/walnutcrasher/servercursemanager/")
+}
+
+jar {
+    manifest = project.manifest {
+        from sharedManifest
+    }
+}
+
+task sourcesJar(type: Jar) {
+    archiveClassifier = 'sources'
+    from sourceSets.main.allSource
+}
+
+
+dependencies {
+	implementation("cpw.mods:modlauncher:7.0.+")
+	implementation("net.minecraftforge:forgespi:3.1.+")
+    /*
+    implementation("com.google.code.gson:gson:2.8.0")
+    implementation("org.apache.logging.log4j:log4j-api:2.11.2")
+    implementation("io.netty:netty-all:4.1.25.Final")
+    implementation("com.electronwill.night-config:core:3.6.0")
+    implementation("com.electronwill.night-config:toml:3.6.0")
+    implementation("org.apache.maven:maven-artifact:3.6.3")
+    testImplementation("org.junit.jupiter:junit-jupiter:5.4.2")
+    */
+}
+
+task allzips dependsOn('zip', 'serverzip')
+
+task zip(type: Zip, dependsOn: jar) {
+    archiveClassifier = "bundle"
+    from (jar.outputs) { into ("libraries/cpw/mods/forge/serverpacklocator/${project.version}/") }
+    from (file("1.14.4-serverpacklocator.json")) {
+        filter { line -> line
+                .replace('@version@', "${project.version}")
+                .replace('@forgeversion@', "${forge_version}")
+        }
+        into ("versions/1.14.4-serverpacklocator/")
+    }
+}
+
+task serverzip(type: Zip, dependsOn: jar) {
+    archiveClassifier = "serverbundle"
+    from (jar.outputs) {
+        into ("/")
+    }
+    from (files("signcertificate.sh", "runserver.sh")) {
+        filter { line -> line
+                .replace('@version@', "${project.version}")
+                .replace('@forgeversion@', "${forge_version}")
+        }
+        into("/")
+    }
+}
+artifacts {
+    archives zip
+    archives jar
+    archives sourcesJar
+}
+
+compileJava {
+    options.compilerArgs << "-XDignore.symbol.file"
+    options.fork = true
+    options.forkOptions.executable = 'javac'
+}
