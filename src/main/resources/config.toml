@@ -1,0 +1,10 @@
+[config]
+# Enter the name of the server as resolved by DNS. This will be used by clients to connect, and will be asserted
+# as valid by client certificates
+server = "localhost"
+# Enter a port to listen on. This will be serving public HTTP requests.
+port = 8080
+# Path to store the certificate we will generate
+certificate = "cacert.pem"
+# Path to store the private key we will generate
+key = "ca.key"

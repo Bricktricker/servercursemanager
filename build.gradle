@@ -31,6 +31,7 @@ ext.sharedManifest = manifest {
              "Specification-Version"   : "1",
              "Implementation-Title"    : project.name,
              "Implementation-Vendor"   : "walnutcrasher",
+             "Implementation-Version"  : "${version}",
              "Implementation-Timestamp": new Date().format("yyyy-MM-dd'T'HH:mm:ssZ")],
             "com/walnutcrasher/servercursemanager/")
 }
@@ -50,12 +51,12 @@ task sourcesJar(type: Jar) {
 dependencies {
 	implementation("cpw.mods:modlauncher:7.0.+")
 	implementation("net.minecraftforge:forgespi:3.1.+")
+	implementation("com.electronwill.night-config:core:3.6.2")
+    implementation("com.electronwill.night-config:toml:3.6.2")
     /*
     implementation("com.google.code.gson:gson:2.8.0")
     implementation("org.apache.logging.log4j:log4j-api:2.11.2")
     implementation("io.netty:netty-all:4.1.25.Final")
-    implementation("com.electronwill.night-config:core:3.6.0")
-    implementation("com.electronwill.night-config:toml:3.6.0")
     implementation("org.apache.maven:maven-artifact:3.6.3")
     testImplementation("org.junit.jupiter:junit-jupiter:5.4.2")
     */
