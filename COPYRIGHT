@@ -1,2 +1,3 @@
 Murmur2 file from https://github.com/prasanthj/hasher/blob/master/src/main/java/hasher/Murmur2.java under Apache2 license. Applied changes from https://github.com/cpw/cursepacklocator/pull/3
 Files in src/main/java/cpw from https://github.com/cpw/serverpacklocator/blob/e0e101c8db9008e7b9f9c8e0841fa92bf69ffcdb/src/main/java/cpw and https://github.com/cpw/cursepacklocator/blob/af022a248bb24ebca3d971b515f2380dc709822c/src/main/java/cpw under LGPLv2.1
+contains /src/main/recources/utilmod/serverpackutility.jar as a build from https://github.com/cpw/serverpacklocatorutility/tree/b175276c08223a4b36d272683895f0613a9992f0

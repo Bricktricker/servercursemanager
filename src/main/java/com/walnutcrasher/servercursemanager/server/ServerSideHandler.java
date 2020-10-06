@@ -6,6 +6,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -19,7 +21,6 @@ import com.walnutcrasher.servercursemanager.CurseDownloader;
 import com.walnutcrasher.servercursemanager.SideHandler;
 import com.walnutcrasher.servercursemanager.Utils;
 
-import cpw.mods.forge.cursepacklocator.HashChecker;
 import cpw.mods.forge.serverpacklocator.server.ServerCertificateManager;
 import cpw.mods.forge.serverpacklocator.server.SimpleHttpServer;
 
@@ -27,6 +28,8 @@ public class ServerSideHandler extends SideHandler {
 
 	private ServerCertificateManager certManager;
 	private SimpleHttpServer httpServer;
+	
+	private Set<String> loadedModNames;
 
 	public ServerSideHandler(Path gameDir) {
 		super(gameDir);
@@ -50,6 +53,7 @@ public class ServerSideHandler extends SideHandler {
 		}
 
 		this.loadMappings();
+		this.loadedModNames = new HashSet<>();
 
 		final ExecutorService executorService = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors() / 2);
 		final ExecutorService singleExcecutor = Executors.newSingleThreadExecutor();
@@ -72,15 +76,18 @@ public class ServerSideHandler extends SideHandler {
 				executorService.execute(() -> {
 					if(!this.hasFile(projectID, fileID)) {
 						try {
-							ModMapping mapping = CurseDownloader.downloadMod(projectID, fileID, getServermodsFolder());
+							final ModMapping mapping = CurseDownloader.downloadMod(projectID, fileID, getServermodsFolder());
 							this.addMapping(mapping);
+							
+							singleExcecutor.submit(() -> {
+								manifestMods.add(mod);
+								this.loadedModNames.add(mapping.getFileName());
+							});
 						}catch(IOException e) {
 							LOGGER.catching(e);
 							return;
 						}
 					}
-					
-					singleExcecutor.submit(() -> manifestMods.add(mod));
 				});
 
 			}else if("local".equals(source)) {
@@ -117,6 +124,7 @@ public class ServerSideHandler extends SideHandler {
 						}
 						
 						manifestMods.add(modManifest);
+						this.loadedModNames.add(modName);
 					});
 				});
 			}else {
@@ -176,6 +184,11 @@ public class ServerSideHandler extends SideHandler {
 		
 		byte[] packData = baos.toByteArray();
 		this.httpServer = new SimpleHttpServer(this, packData);
+	}
+	
+	@Override
+	public boolean shouldLoadFile(String modfile) {
+		return this.loadedModNames.contains(modfile);
 	}
 	
 	public ServerCertificateManager getCertificateManager() {

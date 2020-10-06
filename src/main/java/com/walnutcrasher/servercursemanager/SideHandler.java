@@ -124,6 +124,8 @@ public abstract class SideHandler {
 	
 	public abstract void initialize();
 	
+	public abstract boolean shouldLoadFile(String modfile);
+	
 	protected Path getServerpackFolder() {
 		return this.serverpackFolder;
 	}
