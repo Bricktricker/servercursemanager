@@ -22,27 +22,28 @@ import java.util.function.Consumer;
  * @author cpw
  * 
  * inlined ifPresentOrElse from here https://github.com/cpw/serverpacklocator/blob/e0e101c8db9008e7b9f9c8e0841fa92bf69ffcdb/src/main/java/cpw/mods/forge/serverpacklocator/OptionalHelper.java#L8
+ * updated config keys
  */
 public class ServerCertificateManager {
     private static final Logger LOGGER = LogManager.getLogger();
     private X509Certificate cert;
     private KeyPair keyPair;
 
-    public ServerCertificateManager(final FileConfig config, final Path serverModsDir) {
-        final Optional<String> keyFile = config.getOptional("server.cakey");
+    public ServerCertificateManager(final FileConfig config, final Path configDir) {
+        final Optional<String> keyFile = config.getOptional("config.key");
         ifPresentOrElse(keyFile
-                .map(serverModsDir::resolve)
+                .map(configDir::resolve)
                 .filter(Files::exists),
                 path -> CertificateManager.loadKey(path, key->this.keyPair = key),
-                () -> CertificateManager.buildNewKeyPair(serverModsDir, keyFile.get(), key->this.keyPair = key)
+                () -> CertificateManager.buildNewKeyPair(configDir, keyFile.get(), key->this.keyPair = key)
         );
 
-        final Optional<String> cacertificate = config.getOptional("server.cacertificate");
+        final Optional<String> cacertificate = config.getOptional("config.certificate");
         ifPresentOrElse(cacertificate
-                .map(serverModsDir::resolve)
+                .map(configDir::resolve)
                 .filter(Files::exists),
                 path -> CertificateManager.loadCertificates(path, certs -> this.cert = certs.get(0)),
-                ()->this.generateCaCert(serverModsDir, cacertificate.get(), config.get("server.name"))
+                ()->this.generateCaCert(configDir, cacertificate.get(), config.get("config.server"))
         );
 
         try {

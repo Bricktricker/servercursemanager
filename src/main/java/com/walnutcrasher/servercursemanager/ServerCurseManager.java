@@ -52,28 +52,26 @@ public class ServerCurseManager implements IModLocator {
 
 	@Override
 	public Path findPath(IModFile modFile, String... path) {
-		return null;
+		return dirLocator.findPath(modFile, path);
 	}
 
 	@Override
 	public void scanFile(IModFile modFile, Consumer<Path> pathConsumer) {
-
+		dirLocator.scanFile(modFile, pathConsumer);
 	}
 
 	@Override
 	public Optional<Manifest> findManifest(Path file) {
-		return null;
+		return dirLocator.findManifest(file);
 	}
 
 	@Override
 	public void initArguments(Map<String, ?> arguments) {
 		final IModDirectoryLocatorFactory modFileLocator = LaunchEnvironmentHandler.INSTANCE.getModFolderFactory();
-        dirLocator = modFileLocator.build(null, "serverpack");
-        /*
-        if (serverPackLocator.isValid()) {
-            serverPackLocator.initialize(dirLocator);
+        dirLocator = modFileLocator.build(sideHandler.getServermodsFolder(), "serverpack");
+        if (sideHandler.isValid()) {
+        	sideHandler.initialize();
         }
-        */
 	}
 
 	@Override
