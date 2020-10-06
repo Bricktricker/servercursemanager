@@ -3,11 +3,14 @@ package com.walnutcrasher.servercursemanager;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.io.Reader;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.TimeZone;
+import java.util.zip.ZipEntry;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
@@ -55,6 +58,25 @@ public class Utils {
 		}catch(IOException e) {
 			throw new UncheckedIOException(e);
 		}
+	}
+	
+	public static void saveJson(JsonElement json, OutputStream os) {
+		String jsonStr = json.toString();
+		try {
+			os.write(jsonStr.getBytes(StandardCharsets.UTF_8));
+		}catch(IOException e) {
+			throw new UncheckedIOException(e);
+		}
+	}
+	
+	//Copied from https://github.com/MinecraftForge/ForgeGradle/blob/9dcce0d43044018f5f2191df6d702e9f4c651bee/src/common/java/net/minecraftforge/gradle/common/util/Utils.java#L584
+	public static ZipEntry getStableEntry(String name) {
+		TimeZone _default = TimeZone.getDefault();
+        TimeZone.setDefault(TimeZone.getTimeZone("GMT"));
+        ZipEntry ret = new ZipEntry(name);
+        ret.setTime(628041600000L);
+        TimeZone.setDefault(_default);
+        return ret;
 	}
 
 }

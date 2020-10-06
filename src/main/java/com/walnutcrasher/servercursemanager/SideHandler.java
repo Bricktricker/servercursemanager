@@ -3,7 +3,6 @@ package com.walnutcrasher.servercursemanager;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.StreamSupport;
@@ -16,8 +15,6 @@ import com.electronwill.nightconfig.core.file.FileConfig;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-
-import net.minecraftforge.forgespi.locating.IModLocator;
 
 public abstract class SideHandler {
 	
@@ -60,7 +57,7 @@ public abstract class SideHandler {
 	}
 	
 	protected void loadMappings() {
-		this.modMappings = Collections.synchronizedList(new ArrayList<>());
+		this.modMappings = new ArrayList<>();
 		Path modMappingsFile = this.serverpackFolder.resolve("files.json");
 		if(!Files.exists(modMappingsFile)) {
 			return;
@@ -80,7 +77,10 @@ public abstract class SideHandler {
 	}
 	
 	protected void addMapping(ModMapping mapping) {
-		this.modMappings.add(mapping);
+		synchronized (this.modMappings) {
+			this.modMappings.removeIf(mod -> mod.projectID == mapping.projectID && mod.fileID == mapping.fileID);
+			this.modMappings.add(mapping);	
+		}
 	}
 	
 	protected void saveAndCloseMappings() {
@@ -101,7 +101,11 @@ public abstract class SideHandler {
 	}
 	
 	protected boolean hasFile(int projectID, int fileID) {
-		Optional<ModMapping> modMapping = this.modMappings.stream().filter(mod -> mod.projectID == projectID && mod.fileID == fileID).findAny();
+		Optional<ModMapping> modMapping;
+		synchronized(this.modMappings) {
+			modMapping = this.modMappings.stream().filter(mod -> mod.projectID == projectID && mod.fileID == fileID).findAny();	
+		}
+		
 		if(!modMapping.isPresent()) {
 			return false;
 		}

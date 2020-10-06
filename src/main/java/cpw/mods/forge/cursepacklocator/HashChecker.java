@@ -9,6 +9,8 @@ import java.nio.file.Path;
 /**
  * Copied from https://github.com/cpw/cursepacklocator/blob/af022a248bb24ebca3d971b515f2380dc709822c/src/main/java/cpw/mods/forge/cursepacklocator/HashChecker.java
  * @author cpw
+ * 
+ * Added computeHash(byte[]) method
  */
 public class HashChecker {
     // Credit to https://github.com/comp500/packwiz-installer/blob/580408b92a214384e3764a8fc848775c149f2fef/src/main/java/link/infra/packwiz/installer/metadata/hash/Murmur2Hasher.java#L39-L52
@@ -32,5 +34,11 @@ public class HashChecker {
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
+    }
+    
+    public static long computeHash(final byte[] bytes) {
+    	final byte[] normalizedArray = computeNormalizedArray(bytes);
+        int res = Murmur2.hash32(normalizedArray, normalizedArray.length, 1);
+        return Integer.toUnsignedLong(res);
     }
 }
