@@ -132,6 +132,10 @@ public abstract class SideHandler {
 		return this.serverModsPath;
 	}
 	
+	public int getPort() {
+		return this.configPort;
+	}
+	
 	private static boolean isBlank(String s) {
 		return s == null || s.trim().isEmpty(); 
 	}

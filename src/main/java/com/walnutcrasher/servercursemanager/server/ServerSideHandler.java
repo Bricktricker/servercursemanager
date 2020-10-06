@@ -21,10 +21,12 @@ import com.walnutcrasher.servercursemanager.Utils;
 
 import cpw.mods.forge.cursepacklocator.HashChecker;
 import cpw.mods.forge.serverpacklocator.server.ServerCertificateManager;
+import cpw.mods.forge.serverpacklocator.server.SimpleHttpServer;
 
 public class ServerSideHandler extends SideHandler {
 
 	private ServerCertificateManager certManager;
+	private SimpleHttpServer httpServer;
 
 	public ServerSideHandler(Path gameDir) {
 		super(gameDir);
@@ -173,9 +175,11 @@ public class ServerSideHandler extends SideHandler {
 		}
 		
 		byte[] packData = baos.toByteArray();
-		String hash = String.valueOf(HashChecker.computeHash(packData));
-
-		//TODO: start HTTPS server
+		this.httpServer = new SimpleHttpServer(this, packData);
+	}
+	
+	public ServerCertificateManager getCertificateManager() {
+		return this.certManager;
 	}
 
 }
