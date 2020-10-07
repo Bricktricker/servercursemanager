@@ -20,6 +20,7 @@ package cpw.mods.forge.cursepacklocator;
  * 32-bit Java port of https://code.google.com/p/smhasher/source/browse/trunk/MurmurHash2.cpp#37
  * 64-bit Java port of https://code.google.com/p/smhasher/source/browse/trunk/MurmurHash2.cpp#96
  * 
+ * Changes:
  * Added changes from PR https://github.com/cpw/cursepacklocator/pull/3
  */
 public class Murmur2 {

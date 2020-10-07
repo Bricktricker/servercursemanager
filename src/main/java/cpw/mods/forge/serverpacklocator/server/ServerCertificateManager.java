@@ -1,6 +1,8 @@
 package cpw.mods.forge.serverpacklocator.server;
 
 import com.electronwill.nightconfig.core.file.FileConfig;
+import com.walnutcrasher.servercursemanager.Utils;
+
 import cpw.mods.forge.serverpacklocator.cert.CertificateManager;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -21,7 +23,8 @@ import java.util.function.Consumer;
  * copied from https://github.com/cpw/serverpacklocator/blob/e0e101c8db9008e7b9f9c8e0841fa92bf69ffcdb/src/main/java/cpw/mods/forge/serverpacklocator/server/ServerCertificateManager.java
  * @author cpw
  * 
- * inlined ifPresentOrElse from here https://github.com/cpw/serverpacklocator/blob/e0e101c8db9008e7b9f9c8e0841fa92bf69ffcdb/src/main/java/cpw/mods/forge/serverpacklocator/OptionalHelper.java#L8
+ * Changes:
+ * Use ifPresentOrElse from Utils
  * updated config keys
  */
 public class ServerCertificateManager {
@@ -31,7 +34,7 @@ public class ServerCertificateManager {
 
     public ServerCertificateManager(final FileConfig config, final Path configDir) {
         final Optional<String> keyFile = config.getOptional("config.key");
-        ifPresentOrElse(keyFile
+        Utils.ifPresentOrElse(keyFile
                 .map(configDir::resolve)
                 .filter(Files::exists),
                 path -> CertificateManager.loadKey(path, key->this.keyPair = key),
@@ -39,7 +42,7 @@ public class ServerCertificateManager {
         );
 
         final Optional<String> cacertificate = config.getOptional("config.certificate");
-        ifPresentOrElse(cacertificate
+        Utils.ifPresentOrElse(cacertificate
                 .map(configDir::resolve)
                 .filter(Files::exists),
                 path -> CertificateManager.loadCertificates(path, certs -> this.cert = certs.get(0)),
@@ -69,12 +72,5 @@ public class ServerCertificateManager {
     public X509Certificate getCertificate() {
         return cert;
     }
-    
-    private static <T> void ifPresentOrElse(Optional<T> optional, Consumer<T> action, Runnable orElse) {
-        if (optional.isPresent()) {
-            optional.ifPresent(action);
-        } else {
-            orElse.run();
-        }
-    }
+ 
 }

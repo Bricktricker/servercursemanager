@@ -9,7 +9,9 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Optional;
 import java.util.TimeZone;
+import java.util.function.Consumer;
 import java.util.zip.ZipEntry;
 
 import com.google.gson.JsonElement;
@@ -78,5 +80,14 @@ public class Utils {
         TimeZone.setDefault(_default);
         return ret;
 	}
+	
+	//Copied from: https://github.com/cpw/serverpacklocator/blob/e0e101c8db9008e7b9f9c8e0841fa92bf69ffcdb/src/main/java/cpw/mods/forge/serverpacklocator/OptionalHelper.java#L8
+	public static <T> void ifPresentOrElse(Optional<T> optional, Consumer<T> action, Runnable orElse) {
+        if (optional.isPresent()) {
+            optional.ifPresent(action);
+        } else {
+            orElse.run();
+        }
+    }
 
 }

@@ -3,8 +3,10 @@ package com.walnutcrasher.servercursemanager;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.StreamSupport;
 
 import org.apache.logging.log4j.LogManager;
@@ -30,6 +32,8 @@ public abstract class SideHandler {
 	protected String configKey;
 	
 	protected List<ModMapping> modMappings;
+	
+	protected Set<String> loadedModNames;
 	
 	private Path serverpackFolder;
 	
@@ -84,6 +88,10 @@ public abstract class SideHandler {
 	}
 	
 	protected void saveAndCloseMappings() {
+		if(this.modMappings == null) {
+			return;
+		}
+		
 		JsonArray mappingArray = new JsonArray();
 		for(ModMapping mapping : this.modMappings) {
 			JsonObject mod = new JsonObject();
@@ -120,13 +128,23 @@ public abstract class SideHandler {
 		return true;
 	}
 	
+	public void doCleanup() {
+		this.saveAndCloseMappings();
+		this.loadedModNames = null;
+	}
+	
+	public void initialize() {
+		this.loadedModNames = new HashSet<>();
+		this.loadMappings();
+	}
+	
 	public abstract boolean isValid();
 	
-	public abstract void initialize();
+	public boolean shouldLoadFile(String modfile) {
+		return this.loadedModNames.contains(modfile);
+	}
 	
-	public abstract boolean shouldLoadFile(String modfile);
-	
-	protected Path getServerpackFolder() {
+	public Path getServerpackFolder() {
 		return this.serverpackFolder;
 	}
 	
@@ -136,6 +154,10 @@ public abstract class SideHandler {
 	
 	public int getPort() {
 		return this.configPort;
+	}
+	
+	public String getServer() {
+		return this.configServer;
 	}
 	
 	private static boolean isBlank(String s) {

@@ -10,6 +10,7 @@ import java.nio.file.Path;
  * Copied from https://github.com/cpw/cursepacklocator/blob/af022a248bb24ebca3d971b515f2380dc709822c/src/main/java/cpw/mods/forge/cursepacklocator/HashChecker.java
  * @author cpw
  * 
+ * Changes:
  * Added computeHash(byte[]) method
  */
 public class HashChecker {

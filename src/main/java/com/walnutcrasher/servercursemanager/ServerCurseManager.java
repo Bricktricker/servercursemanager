@@ -31,18 +31,18 @@ import net.minecraftforge.forgespi.locating.IModFile;
 import net.minecraftforge.forgespi.locating.IModLocator;
 
 public class ServerCurseManager implements IModLocator {
-	
+
 	private static final Logger LOGGER = LogManager.getLogger();
-	
+
 	private IModLocator dirLocator;
-	
+
 	private SideHandler sideHandler;
-	
+
 	public ServerCurseManager() {
 		LOGGER.info("Loading Server Curse Manager. Version {}", getClass().getPackage().getImplementationVersion());
 		Dist currentDist = LaunchEnvironmentHandler.INSTANCE.getDist();
 		final Path gameDir = LaunchEnvironmentHandler.INSTANCE.getGameDir();
-		
+
 		if(currentDist.isDedicatedServer()) {
 			sideHandler = new ServerSideHandler(gameDir);
 		}else {
@@ -53,20 +53,22 @@ public class ServerCurseManager implements IModLocator {
 	@Override
 	public List<IModFile> scanMods() {
 		final List<IModFile> modFiles = dirLocator.scanMods();
-        final IModFile packutil = modFiles.stream()
-                .filter(modFile -> "serverpackutility.jar".equals(modFile.getFileName()))
-                .findFirst()
-                .orElseThrow(() -> new RuntimeException("Something went wrong with the internal utility mod"));
-		
-        List<IModFile> finalModList = modFiles.stream()
-        	.filter(mf -> sideHandler.shouldLoadFile(mf.getFileName()))
-        	.collect(Collectors.toCollection(() -> new ArrayList<>()));
-        
-        finalModList.add(packutil);
+		final IModFile packutil = modFiles.stream()
+				.filter(modFile -> "serverpackutility.jar".equals(modFile.getFileName()))
+				.findFirst()
+				.orElseThrow(() -> new RuntimeException("Something went wrong with the internal utility mod"));
 
-        //TODO: make specific
-        ModAccessor.statusLine = "ServerPack: " + "loaded";
-        return finalModList;
+		List<IModFile> finalModList = modFiles.stream()
+				.filter(mf -> sideHandler.shouldLoadFile(mf.getFileName()))
+				.collect(Collectors.toCollection(() -> new ArrayList<>()));
+
+		finalModList.add(packutil);
+
+		// TODO: make specific
+		ModAccessor.statusLine = "ServerPack: " + "loaded";
+
+		sideHandler.doCleanup();
+		return finalModList;
 	}
 
 	@Override
@@ -92,18 +94,19 @@ public class ServerCurseManager implements IModLocator {
 	@Override
 	public void initArguments(Map<String, ?> arguments) {
 		final IModDirectoryLocatorFactory modFileLocator = LaunchEnvironmentHandler.INSTANCE.getModFolderFactory();
-        dirLocator = modFileLocator.build(sideHandler.getServermodsFolder(), "serverpack");
-        if (sideHandler.isValid()) {
-        	sideHandler.initialize();
-        }
-        
-        //installes the serverpackutility mod. Copied from https://github.com/cpw/serverpacklocator/blob/e0e101c8db9008e7b9f9c8e0841fa92bf69ffcdb/src/main/java/cpw/mods/forge/serverpacklocator/PackLocator.java#L80-L84
-        Path serverModsPath = sideHandler.getServermodsFolder();
-        URL url = getClass().getProtectionDomain().getCodeSource().getLocation();
-        URI targetURI = LamdbaExceptionUtils.uncheck(() -> new URI("file://"+LamdbaExceptionUtils.uncheck(url::toURI).getRawSchemeSpecificPart().split("!")[0]));
-        final FileSystem thiszip = LamdbaExceptionUtils.uncheck(() -> FileSystems.newFileSystem(Paths.get(targetURI),getClass().getClassLoader()));
-        final Path utilModPath = thiszip.getPath("utilmod", "serverpackutility.jar");
-        LamdbaExceptionUtils.uncheck(()->Files.copy(utilModPath, serverModsPath.resolve("serverpackutility.jar"), StandardCopyOption.REPLACE_EXISTING));
+		dirLocator = modFileLocator.build(sideHandler.getServermodsFolder(), "serverpack");
+		if(sideHandler.isValid()) {
+			sideHandler.initialize();
+		}
+
+		// installes the serverpackutility mod. Copied from
+		// https://github.com/cpw/serverpacklocator/blob/e0e101c8db9008e7b9f9c8e0841fa92bf69ffcdb/src/main/java/cpw/mods/forge/serverpacklocator/PackLocator.java#L80-L84
+		Path serverModsPath = sideHandler.getServermodsFolder();
+		URL url = getClass().getProtectionDomain().getCodeSource().getLocation();
+		URI targetURI = LamdbaExceptionUtils.uncheck(() -> new URI("file://" + LamdbaExceptionUtils.uncheck(url::toURI).getRawSchemeSpecificPart().split("!")[0]));
+		final FileSystem thiszip = LamdbaExceptionUtils.uncheck(() -> FileSystems.newFileSystem(Paths.get(targetURI), getClass().getClassLoader()));
+		final Path utilModPath = thiszip.getPath("utilmod", "serverpackutility.jar");
+		LamdbaExceptionUtils.uncheck(() -> Files.copy(utilModPath, serverModsPath.resolve("serverpackutility.jar"), StandardCopyOption.REPLACE_EXISTING));
 	}
 
 	@Override

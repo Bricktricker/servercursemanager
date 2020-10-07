@@ -26,6 +26,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * copied from https://github.com/cpw/serverpacklocator/blob/e0e101c8db9008e7b9f9c8e0841fa92bf69ffcdb/src/main/java/cpw/mods/forge/serverpacklocator/server/SimpleHttpServer.java
  * @author cpw
  * 
+ * Changes:
  * made constructor public
  * modified port getter
  * modified logging output

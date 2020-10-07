@@ -6,8 +6,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
-import java.util.HashSet;
-import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -27,9 +25,8 @@ import cpw.mods.forge.serverpacklocator.server.SimpleHttpServer;
 public class ServerSideHandler extends SideHandler {
 
 	private ServerCertificateManager certManager;
+	@SuppressWarnings("unused")
 	private SimpleHttpServer httpServer;
-	
-	private Set<String> loadedModNames;
 
 	public ServerSideHandler(Path gameDir) {
 		super(gameDir);
@@ -44,6 +41,8 @@ public class ServerSideHandler extends SideHandler {
 
 	@Override
 	public void initialize() {
+		super.initialize();
+		
 		// load modpack config
 		JsonObject packConfig = Utils.loadJson(getServerpackFolder().resolve("pack.json")).getAsJsonObject();
 
@@ -51,9 +50,6 @@ public class ServerSideHandler extends SideHandler {
 			LOGGER.error("pack configuration for Server Curse Manager is missing mods list");
 			throw new IllegalArgumentException("mods not specified in modpack configuration");
 		}
-
-		this.loadMappings();
-		this.loadedModNames = new HashSet<>();
 
 		final ExecutorService executorService = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors() / 2);
 		final ExecutorService singleExcecutor = Executors.newSingleThreadExecutor();
@@ -133,6 +129,7 @@ public class ServerSideHandler extends SideHandler {
 			}
 		}
 		
+		JsonArray manifestAdditional = new JsonArray();
 		//gather aditional files
 		if(packConfig.has("additional")) {
 			JsonArray additional = packConfig.getAsJsonArray("additional");
@@ -153,9 +150,11 @@ public class ServerSideHandler extends SideHandler {
 					try {
 						zos.putNextEntry(entry);
 						Files.copy(filePath, zos);
-						zos.closeEntry();	
+						zos.closeEntry();
+						manifestAdditional.add(target);
 					}catch(IOException e) {
 						LOGGER.catching(e);
+						return;
 					}
 				});
 			}
@@ -171,10 +170,14 @@ public class ServerSideHandler extends SideHandler {
 		}
 
 		// create modpack zip
+		JsonObject manifest = new JsonObject();
+		manifest.add("mods", manifestMods);
+		manifest.add("additional", manifestAdditional);
+		
 		try {
 			ZipEntry manifestEntry = Utils.getStableEntry("manifest.json");
 			zos.putNextEntry(manifestEntry);
-			Utils.saveJson(manifestMods, zos);
+			Utils.saveJson(manifest, zos);
 			zos.closeEntry();
 			zos.close(); //Close pack zip
 		}catch(IOException e) {
@@ -184,11 +187,6 @@ public class ServerSideHandler extends SideHandler {
 		
 		byte[] packData = baos.toByteArray();
 		this.httpServer = new SimpleHttpServer(this, packData);
-	}
-	
-	@Override
-	public boolean shouldLoadFile(String modfile) {
-		return this.loadedModNames.contains(modfile);
 	}
 	
 	public ServerCertificateManager getCertificateManager() {
