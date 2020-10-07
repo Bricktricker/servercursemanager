@@ -50,7 +50,7 @@ public class ServerCertificateManager {
         );
 
         try {
-            if (!(Objects.equals(config.get("server.name"), ((X500Name)this.cert.getSubjectDN()).getCommonName()))) {
+            if (!(Objects.equals(config.get("config.server"), ((X500Name)this.cert.getSubjectDN()).getCommonName()))) {
                 LOGGER.fatal("The certificate has an incorrect name. It will need to be regenerated, as will " +
                         "all dependent certificates.");
                 throw new IllegalStateException("Bad certificate");

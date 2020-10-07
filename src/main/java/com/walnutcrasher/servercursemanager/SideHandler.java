@@ -14,6 +14,7 @@ import org.apache.logging.log4j.Logger;
 
 import com.electronwill.nightconfig.core.file.CommentedFileConfig;
 import com.electronwill.nightconfig.core.file.FileConfig;
+import com.electronwill.nightconfig.core.file.FileNotFoundAction;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -43,7 +44,7 @@ public abstract class SideHandler {
 		
 		this.packConfig = CommentedFileConfig.builder(serverpackFolder.resolve("config.toml"))
 				.preserveInsertionOrder()
-				.defaultResource("config.toml")
+				.onFileNotFound(FileNotFoundAction.copyData(SideHandler.class.getResourceAsStream("/config.toml")))
 				.build();
 		
 		this.packConfig.load();
@@ -58,6 +59,8 @@ public abstract class SideHandler {
             LOGGER.fatal("Invalid configuration for Server Curse Manager found: {}, please delete or correct before trying again", this.packConfig.getNioPath());
 			throw new IllegalStateException("Invalid Configuration");
 		}
+		
+		LOGGER.debug("Configuration: Server {}, Port {}, Certificate {}, Key {}", this.configServer, this.configPort, this.configCertificate, this.configKey);
 	}
 	
 	protected void loadMappings() {
@@ -108,24 +111,20 @@ public abstract class SideHandler {
 		this.modMappings = null;
 	}
 	
-	protected boolean hasFile(int projectID, int fileID) {
+	protected Optional<ModMapping> getMapping(int projectID, int fileID) {
 		Optional<ModMapping> modMapping;
 		synchronized(this.modMappings) {
 			modMapping = this.modMappings.stream().filter(mod -> mod.projectID == projectID && mod.fileID == fileID).findAny();	
 		}
 		
-		if(!modMapping.isPresent()) {
-			return false;
-		}
-		
-		Path modFile = this.serverModsPath.resolve(modMapping.get().fileName);
-		if(!Files.exists(modFile)) {
-			return false;
-		}
+		modMapping.filter(mapping -> {
+			Path modFile = this.serverModsPath.resolve(mapping.fileName);
+			return Files.exists(modFile);
+		});
 		
 		//TODO: check if hash match
 		
-		return true;
+		return modMapping;
 	}
 	
 	public void doCleanup() {
@@ -139,6 +138,10 @@ public abstract class SideHandler {
 	}
 	
 	public abstract boolean isValid();
+	
+	public String getStatus() {
+		return "";
+	}
 	
 	public boolean shouldLoadFile(String modfile) {
 		return this.loadedModNames.contains(modfile);

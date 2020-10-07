@@ -1,0 +1,16 @@
+{
+  "id": "1.16.3-servercursemanager",
+  "time": "2019-09-01T18:46:04+00:00",
+  "releaseTime": "2019-10-18T00:00:00+00:00",
+  "type": "release",
+  "mainClass": "cpw.mods.modlauncher.Launcher",
+  "inheritsFrom": "1.16.3-forge-@forgeversion@",
+  "logging": {
+
+  },
+  "libraries": [
+    {
+      "name": "com.walnutcrasher:servercursemanager:@version@"
+    }
+  ]
+}

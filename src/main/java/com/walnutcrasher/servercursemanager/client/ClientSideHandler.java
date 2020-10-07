@@ -24,8 +24,10 @@ import cpw.mods.forge.serverpacklocator.client.ClientCertificateManager;
 
 public class ClientSideHandler extends SideHandler {
 
-	private final ClientCertificateManager certManager;
+	private ClientCertificateManager certManager;
 	private SimpleHttpClient httpClient;
+	
+	private String status = "";
 
 	public ClientSideHandler(Path gameDir) {
 		super(gameDir);
@@ -51,15 +53,22 @@ public class ClientSideHandler extends SideHandler {
 		this.httpClient = new SimpleHttpClient(this, currentModpackHash);
 
 		// TODO: move to scanMods?
+		boolean downloadSuccessful = false;
 		try {
-			this.httpClient.waitForResult();
+			downloadSuccessful = this.httpClient.waitForResult();
 		}catch(ExecutionException e) {
 			LOGGER.catching(e);
+		}
+		
+		if(!downloadSuccessful) {
+			//If this is the first start and no modpack is available, it's getting overwritten in the next block
+			this.status = "Using old Modpack version";
 		}
 
 		if(!Files.exists(modpackZip) || !Files.isRegularFile(modpackZip)) {
 			LOGGER.warn("Could not download modpack, won't load any mods");
 			LaunchEnvironmentHandler.INSTANCE.addProgressMessage("Could not download modpack, won't load any mods");
+			this.status = "No mods loaded";
 			return;
 		}
 
@@ -78,18 +87,26 @@ public class ClientSideHandler extends SideHandler {
 					int projectID = mod.getAsJsonPrimitive("projectID").getAsInt();
 					int fileID = mod.getAsJsonPrimitive("fileID").getAsInt();
 
-					executorService.execute(() -> {
-						if(!this.hasFile(projectID, fileID)) {
-							try {
-								final ModMapping mapping = CurseDownloader.downloadMod(projectID, fileID, getServermodsFolder());
-								this.addMapping(mapping);
-
-								singleExcecutor.submit(() -> this.loadedModNames.add(mapping.getFileName()));
-							}catch(IOException e) {
-								LOGGER.catching(e);
-								return;
+					executorService.execute(() -> {						
+						ModMapping mapping = this.getMapping(projectID, fileID)
+								.orElseGet(() -> {
+									try {
+										LOGGER.debug("Downloading curse file {} for project {}", fileID, projectID);
+										ModMapping m = CurseDownloader.downloadMod(projectID, fileID, getServermodsFolder());
+										this.addMapping(m);
+										return m;
+									}catch(IOException e) {
+										LOGGER.catching(e);
+										return null;
+									}
+								});
+							
+							if(mapping != null) {
+								singleExcecutor.submit(() -> {
+									this.loadedModNames.add(mapping.getFileName());
+								});
 							}
-						}
+						
 					});
 				}else if("local".equals(source)) {
 					String filename = mod.getAsJsonPrimitive("file").getAsString();
@@ -110,12 +127,13 @@ public class ClientSideHandler extends SideHandler {
 
 		}catch(IOException e) {
 			LOGGER.catching(e);
-			return;
+			this.status = "Exception while loading modpack";
 		}finally {
 			try {
 				executorService.shutdown();
-				singleExcecutor.shutdown();
 				executorService.awaitTermination(2, TimeUnit.HOURS);
+				
+				singleExcecutor.shutdown();
 				singleExcecutor.awaitTermination(2, TimeUnit.HOURS);
 			}catch(InterruptedException e) {
 			}
@@ -127,6 +145,12 @@ public class ClientSideHandler extends SideHandler {
 	public void doCleanup() {
 		super.doCleanup();
 		this.httpClient = null;
+		this.certManager = null;
+	}
+	
+	@Override
+	public String getStatus() {
+		return this.status;
 	}
 
 	public ClientCertificateManager getCertManager() {

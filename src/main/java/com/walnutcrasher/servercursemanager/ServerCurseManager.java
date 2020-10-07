@@ -52,6 +52,10 @@ public class ServerCurseManager implements IModLocator {
 
 	@Override
 	public List<IModFile> scanMods() {
+		if(!sideHandler.isValid()) {
+			return new ArrayList<>();
+		}
+		
 		final List<IModFile> modFiles = dirLocator.scanMods();
 		final IModFile packutil = modFiles.stream()
 				.filter(modFile -> "serverpackutility.jar".equals(modFile.getFileName()))
@@ -65,7 +69,7 @@ public class ServerCurseManager implements IModLocator {
 		finalModList.add(packutil);
 
 		// TODO: make specific
-		ModAccessor.statusLine = "ServerPack: " + "loaded";
+		ModAccessor.statusLine = "ServerPack: " + sideHandler.getStatus();
 
 		sideHandler.doCleanup();
 		return finalModList;
@@ -97,6 +101,8 @@ public class ServerCurseManager implements IModLocator {
 		dirLocator = modFileLocator.build(sideHandler.getServermodsFolder(), "serverpack");
 		if(sideHandler.isValid()) {
 			sideHandler.initialize();
+		}else {
+			LOGGER.warn("Server Curse Manager: Invalid configuration");
 		}
 
 		// installes the serverpackutility mod. Copied from

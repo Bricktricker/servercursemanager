@@ -70,19 +70,24 @@ public class ServerSideHandler extends SideHandler {
 				int fileID = mod.getAsJsonPrimitive("fileID").getAsInt();
 
 				executorService.execute(() -> {
-					if(!this.hasFile(projectID, fileID)) {
-						try {
-							final ModMapping mapping = CurseDownloader.downloadMod(projectID, fileID, getServermodsFolder());
-							this.addMapping(mapping);
-							
-							singleExcecutor.submit(() -> {
-								manifestMods.add(mod);
-								this.loadedModNames.add(mapping.getFileName());
-							});
-						}catch(IOException e) {
-							LOGGER.catching(e);
-							return;
-						}
+					ModMapping mapping = this.getMapping(projectID, fileID)
+						.orElseGet(() -> {
+							try {
+								LOGGER.debug("Downloading curse file {} for project {}", fileID, projectID);
+								ModMapping m = CurseDownloader.downloadMod(projectID, fileID, getServermodsFolder());
+								this.addMapping(m);
+								return m;
+							}catch(IOException e) {
+								LOGGER.catching(e);
+								return null;
+							}
+						});
+					
+					if(mapping != null) {
+						singleExcecutor.submit(() -> {
+							manifestMods.add(mod);
+							this.loadedModNames.add(mapping.getFileName());
+						});
 					}
 				});
 
@@ -109,7 +114,6 @@ public class ServerSideHandler extends SideHandler {
 					
 					singleExcecutor.submit(() -> {
 						ZipEntry entry = Utils.getStableEntry("mods/" + modName);
-						entry.setMethod(ZipOutputStream.STORED); //dont compress jar files
 						try {
 							zos.putNextEntry(entry);
 							Files.copy(sourcePath, zos);
@@ -161,9 +165,10 @@ public class ServerSideHandler extends SideHandler {
 		}
 
 		executorService.shutdown();
-		singleExcecutor.shutdown();
 		try {
 			executorService.awaitTermination(2, TimeUnit.HOURS);
+			
+			singleExcecutor.shutdown();
 			singleExcecutor.awaitTermination(2, TimeUnit.HOURS);
 		}catch(InterruptedException e) {
 			LOGGER.catching(e);
