@@ -25,7 +25,6 @@ import java.util.function.Consumer;
  * 
  * Changes:
  * Use ifPresentOrElse from Utils
- * updated config keys
  */
 public class ServerCertificateManager {
     private static final Logger LOGGER = LogManager.getLogger();
@@ -33,7 +32,7 @@ public class ServerCertificateManager {
     private KeyPair keyPair;
 
     public ServerCertificateManager(final FileConfig config, final Path configDir) {
-        final Optional<String> keyFile = config.getOptional("config.key");
+        final Optional<String> keyFile = config.getOptional("server.cakey");
         Utils.ifPresentOrElse(keyFile
                 .map(configDir::resolve)
                 .filter(Files::exists),
@@ -41,18 +40,18 @@ public class ServerCertificateManager {
                 () -> CertificateManager.buildNewKeyPair(configDir, keyFile.get(), key->this.keyPair = key)
         );
 
-        final Optional<String> cacertificate = config.getOptional("config.certificate");
+        final Optional<String> cacertificate = config.getOptional("server.cacertificate");
         Utils.ifPresentOrElse(cacertificate
                 .map(configDir::resolve)
                 .filter(Files::exists),
                 path -> CertificateManager.loadCertificates(path, certs -> this.cert = certs.get(0)),
-                ()->this.generateCaCert(configDir, cacertificate.get(), config.get("config.server"))
+                ()->this.generateCaCert(configDir, cacertificate.get(), config.get("server.name"))
         );
 
         try {
-            if (!(Objects.equals(config.get("config.server"), ((X500Name)this.cert.getSubjectDN()).getCommonName()))) {
+            if (!(Objects.equals(config.get("server.name"), ((X500Name)this.cert.getSubjectDN()).getCommonName()))) {
                 LOGGER.fatal("The certificate has an incorrect name. It will need to be regenerated, as will " +
-                        "all dependent certificates.");
+                        "all dependent certificates. Expected name {}, but got name {}", config.get("server.name"), ((X500Name)this.cert.getSubjectDN()).getCommonName());
                 throw new IllegalStateException("Bad certificate");
             }
         } catch (IOException e) {

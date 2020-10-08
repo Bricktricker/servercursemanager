@@ -43,8 +43,7 @@ public class SimpleHttpClient {
     public SimpleHttpClient(final ClientSideHandler clientSideHandler, String currentModpackHash) {
     	this.clientSideHandler = clientSideHandler;
     	this.currentModpackHash = currentModpackHash;
-        final String remoteServer = String.format("https://%s:%d/", clientSideHandler.getServer(), clientSideHandler.getPort());
-        downloadJob = Executors.newSingleThreadExecutor().submit(() -> this.connectAndDownload(remoteServer));
+        downloadJob = Executors.newSingleThreadExecutor().submit(() -> this.connectAndDownload(clientSideHandler.getRemoteServer()));
     }
 
     private boolean connectAndDownload(final String server) {

@@ -22,21 +22,16 @@ import com.google.gson.JsonObject;
 public abstract class SideHandler {
 	
 	protected static final Logger LOGGER = LogManager.getLogger();
+	protected static final String ADDITIONAL = "additional";
 	
 	protected final FileConfig packConfig;
 	
 	protected final Path serverModsPath;
-	
-	protected String configServer;
-	protected int configPort;
-	protected String configCertificate;
-	protected String configKey;
+	protected Path serverpackFolder;
 	
 	protected List<ModMapping> modMappings;
 	
 	protected Set<String> loadedModNames;
-	
-	private Path serverpackFolder;
 	
 	protected SideHandler(Path gameDir) {		
 		this.serverpackFolder = Utils.createOrGetDirectory(gameDir, "serverpack");
@@ -44,23 +39,13 @@ public abstract class SideHandler {
 		
 		this.packConfig = CommentedFileConfig.builder(serverpackFolder.resolve("config.toml"))
 				.preserveInsertionOrder()
-				.onFileNotFound(FileNotFoundAction.copyData(SideHandler.class.getResourceAsStream("/config.toml")))
+				.onFileNotFound(FileNotFoundAction.copyData(SideHandler.class.getResourceAsStream(this.getConfigFile())))
 				.build();
 		
 		this.packConfig.load();
 		this.packConfig.close();
 		
-		this.configServer = this.packConfig.<String>get("config.server");
-		this.configPort = this.packConfig.getInt("config.port");
-		this.configCertificate = this.packConfig.<String>get("config.certificate");
-		this.configKey = this.packConfig.<String>get("config.key");
-		
-		if(isBlank(configServer) || configPort <= 0 || isBlank(configCertificate) || isBlank(configKey)) {
-            LOGGER.fatal("Invalid configuration for Server Curse Manager found: {}, please delete or correct before trying again", this.packConfig.getNioPath());
-			throw new IllegalStateException("Invalid Configuration");
-		}
-		
-		LOGGER.debug("Configuration: Server {}, Port {}, Certificate {}, Key {}", this.configServer, this.configPort, this.configCertificate, this.configKey);
+		this.validateConfig();
 	}
 	
 	protected void loadMappings() {
@@ -139,6 +124,10 @@ public abstract class SideHandler {
 	
 	public abstract boolean isValid();
 	
+	protected abstract String getConfigFile();
+	
+	protected abstract void validateConfig();
+	
 	public String getStatus() {
 		return "";
 	}
@@ -153,18 +142,6 @@ public abstract class SideHandler {
 	
 	public Path getServermodsFolder() {
 		return this.serverModsPath;
-	}
-	
-	public int getPort() {
-		return this.configPort;
-	}
-	
-	public String getServer() {
-		return this.configServer;
-	}
-	
-	private static boolean isBlank(String s) {
-		return s == null || s.trim().isEmpty(); 
 	}
 	
 	protected static class ModMapping {

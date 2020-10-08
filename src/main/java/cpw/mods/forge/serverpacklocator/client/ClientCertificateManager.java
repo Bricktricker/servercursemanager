@@ -25,9 +25,7 @@ import java.util.Optional;
  * Changes:
  * Use ifPresentOrElse from Utils
  * Made class public
- * Changed config paths
  */
-@SuppressWarnings("OptionalGetWithoutIsPresent")
 public class ClientCertificateManager {
     private static final Logger LOGGER = LogManager.getLogger();
     private final boolean hasCertificate;
@@ -35,8 +33,8 @@ public class ClientCertificateManager {
     private List<X509Certificate> certs;
 
     public ClientCertificateManager(final FileConfig config, final Path configDir, final String uuid) {
-        final Optional<String> certificate = config.getOptional("config.certificate");
-        final Optional<String> key = config.getOptional("config.key");
+        final Optional<String> certificate = config.getOptional("client.certificate");
+        final Optional<String> key = config.getOptional("client.key");
         Utils.ifPresentOrElse(key.map(configDir::resolve)
                 .filter(Files::exists),
                 ky -> CertificateManager.loadKey(ky, k->this.keyPair = k),

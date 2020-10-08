@@ -34,10 +34,37 @@ public class ClientSideHandler extends SideHandler {
 
 		this.certManager = new ClientCertificateManager(this.packConfig, this.getServerpackFolder(), LaunchEnvironmentHandler.INSTANCE.getUUID());
 	}
+	
+	@Override
+	protected String getConfigFile() {
+		return "/defaultclientconfig.toml";
+	}
 
 	@Override
 	public boolean isValid() {
 		return this.certManager.isValid();
+	}
+	
+	@Override
+	protected void validateConfig() {
+		final String uuid = LaunchEnvironmentHandler.INSTANCE.getUUID();
+        if (uuid == null || uuid.length() == 0) {
+            // invalid UUID - probably offline mode. not supported
+            LaunchEnvironmentHandler.INSTANCE.addProgressMessage("NO UUID found. Offline mode does not work. No server mods will be downloaded");
+            LOGGER.error("There was not a valid UUID present in this client launch. You are probably playing offline mode. Trivially, there is nothing for us to do.");
+            throw new IllegalStateException("Offline play not supported");
+        }
+		
+		String certificate = this.packConfig.<String>get("client.certificate");
+		String key = this.packConfig.<String>get("client.key");
+		String remoteServer = this.packConfig.<String>get("client.remoteServer");
+		
+		LOGGER.debug("Configuration: Certificate {}, Key {}, remoteServer {}", certificate, key, remoteServer);
+		
+		if(Utils.isBlank(certificate) || Utils.isBlank(key) || Utils.isBlank(remoteServer)) {
+            LOGGER.fatal("Invalid configuration for Server Curse Manager found: {}, please delete or correct before trying again", this.packConfig.getNioPath());
+			throw new IllegalStateException("Invalid Configuration");
+		}
 	}
 
 	@Override
@@ -63,6 +90,8 @@ public class ClientSideHandler extends SideHandler {
 		if(!downloadSuccessful) {
 			//If this is the first start and no modpack is available, it's getting overwritten in the next block
 			this.status = "Using old Modpack version";
+		}else {
+			this.status = "Using latest Modpack version";
 		}
 
 		if(!Files.exists(modpackZip) || !Files.isRegularFile(modpackZip)) {
@@ -116,13 +145,14 @@ public class ClientSideHandler extends SideHandler {
 				}
 			}
 
-			JsonArray additional = manifest.getAsJsonArray("additional");
+			JsonArray additional = manifest.getAsJsonArray(SideHandler.ADDITIONAL);
 			for(JsonElement fileE : additional) {
 				String file = fileE.getAsJsonPrimitive().getAsString();
-				ZipEntry fileEntry = zf.getEntry("additional/" + file);
+				ZipEntry fileEntry = zf.getEntry(SideHandler.ADDITIONAL + "/" + file);
 				Path destination = LaunchEnvironmentHandler.INSTANCE.getGameDir().resolve(file);
 				Files.createDirectories(destination.getParent());
 				Files.copy(zf.getInputStream(fileEntry), destination, StandardCopyOption.REPLACE_EXISTING);
+				LOGGER.debug("Copied additional file to {}", destination.toString());
 			}
 
 		}catch(IOException e) {
@@ -138,7 +168,13 @@ public class ClientSideHandler extends SideHandler {
 			}catch(InterruptedException e) {
 			}
 		}
+		
+		
 
+	}
+	
+	public String getRemoteServer() {
+		return this.packConfig.get("client.remoteServer");
 	}
 
 	@Override

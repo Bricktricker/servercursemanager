@@ -33,6 +33,26 @@ public class ServerSideHandler extends SideHandler {
 
 		this.certManager = new ServerCertificateManager(packConfig, packConfig.getNioPath().getParent());
 	}
+	
+	@Override
+	protected String getConfigFile() {
+		return "/defaultserverconfig.toml";
+	}
+	
+	@Override
+	protected void validateConfig() {
+		final String certificate = this.packConfig.get("server.cacertificate");
+        final String key = this.packConfig.get("server.cakey");
+        final String servername = this.packConfig.get("server.name");
+        final int port = this.packConfig.get("server.port");
+		
+        LOGGER.debug("Configuration: Certificate {}, Key {}, servername {}, port {}", certificate, key, servername, port);
+        
+        if(Utils.isBlank(certificate) || Utils.isBlank(key) || Utils.isBlank(servername) || port <= 0) {
+            LOGGER.fatal("Invalid configuration for Server Curse Manager found: {}, please delete or correct before trying again", this.packConfig.getNioPath());
+			throw new IllegalStateException("Invalid Configuration");
+		}
+	}
 
 	@Override
 	public boolean isValid() {
@@ -46,7 +66,7 @@ public class ServerSideHandler extends SideHandler {
 		// load modpack config
 		JsonObject packConfig = Utils.loadJson(getServerpackFolder().resolve("pack.json")).getAsJsonObject();
 
-		if(!packConfig.has("mods")) {
+		if(!packConfig.has("mods") || !packConfig.get("mods").isJsonArray()) {
 			LOGGER.error("pack configuration for Server Curse Manager is missing mods list");
 			throw new IllegalArgumentException("mods not specified in modpack configuration");
 		}
@@ -135,8 +155,8 @@ public class ServerSideHandler extends SideHandler {
 		
 		JsonArray manifestAdditional = new JsonArray();
 		//gather aditional files
-		if(packConfig.has("additional")) {
-			JsonArray additional = packConfig.getAsJsonArray("additional");
+		if(packConfig.has(SideHandler.ADDITIONAL)) {
+			JsonArray additional = packConfig.getAsJsonArray(SideHandler.ADDITIONAL);
 			for(JsonElement fileE : additional) {
 				JsonObject additionalFile = fileE.getAsJsonObject();
 				
@@ -150,7 +170,7 @@ public class ServerSideHandler extends SideHandler {
 				}
 				
 				singleExcecutor.submit(() -> {
-					ZipEntry entry = Utils.getStableEntry("additional/" + target);
+					ZipEntry entry = Utils.getStableEntry(SideHandler.ADDITIONAL + "/" + target);
 					try {
 						zos.putNextEntry(entry);
 						Files.copy(filePath, zos);
@@ -177,7 +197,7 @@ public class ServerSideHandler extends SideHandler {
 		// create modpack zip
 		JsonObject manifest = new JsonObject();
 		manifest.add("mods", manifestMods);
-		manifest.add("additional", manifestAdditional);
+		manifest.add(SideHandler.ADDITIONAL, manifestAdditional);
 		
 		try {
 			ZipEntry manifestEntry = Utils.getStableEntry("manifest.json");
@@ -196,6 +216,10 @@ public class ServerSideHandler extends SideHandler {
 	
 	public ServerCertificateManager getCertificateManager() {
 		return this.certManager;
+	}
+	
+	public int getPort() {
+		return this.packConfig.get("server.port");
 	}
 
 }
