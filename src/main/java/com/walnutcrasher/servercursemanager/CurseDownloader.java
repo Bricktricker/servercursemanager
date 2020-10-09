@@ -6,12 +6,17 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 import com.google.gson.JsonObject;
 import com.walnutcrasher.servercursemanager.SideHandler.ModMapping;
 
 import cpw.mods.forge.cursepacklocator.HashChecker;
 
 public class CurseDownloader {
+	
+	private static final Logger LOGGER = LogManager.getLogger();
 	
 	public static ModMapping downloadMod(int projectID, int fileID, Path targetDir) throws IOException {
 		String metaDataURL = String.format("https://addons-ecs.forgesvc.net/api/v2/addon/%s/file/%s", projectID, fileID);
@@ -30,7 +35,7 @@ public class CurseDownloader {
     	String expectedHash = String.valueOf(metaData.getAsJsonPrimitive("packageFingerprint").getAsLong());
     	
     	if(!modHash.equals(expectedHash)) {
-    		//TODO: log correctly
+    		LOGGER.error("Could not download project {} file {}, expected hash {}, but got hash {}", projectID, fileID, expectedHash, modHash);
     		throw new IOException("Hash does not match!");
     	}
 		

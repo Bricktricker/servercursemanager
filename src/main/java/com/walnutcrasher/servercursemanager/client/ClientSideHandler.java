@@ -78,7 +78,6 @@ public class ClientSideHandler extends SideHandler {
 
 		this.httpClient = new SimpleHttpClient(this, currentModpackHash);
 
-		// TODO: move to scanMods?
 		boolean downloadSuccessful = false;
 		try {
 			downloadSuccessful = this.httpClient.waitForResult();

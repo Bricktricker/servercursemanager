@@ -19,6 +19,8 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
+import cpw.mods.forge.cursepacklocator.HashChecker;
+
 public abstract class SideHandler {
 	
 	protected static final Logger LOGGER = LogManager.getLogger();
@@ -107,7 +109,12 @@ public abstract class SideHandler {
 			return Files.exists(modFile);
 		});
 		
-		//TODO: check if hash match
+		//check hash
+		modMapping.filter(mapping -> {
+			Path modFile = this.serverModsPath.resolve(mapping.fileName);
+			long hash = HashChecker.computeHash(modFile);
+			return String.valueOf(hash).equals(mapping.hash);
+		});
 		
 		return modMapping;
 	}
