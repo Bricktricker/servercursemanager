@@ -30,7 +30,6 @@ public class ServerSideHandler extends SideHandler {
 
 	public ServerSideHandler(Path gameDir) {
 		super(gameDir);
-
 		this.certManager = new ServerCertificateManager(packConfig, packConfig.getNioPath().getParent());
 	}
 	
@@ -45,10 +44,11 @@ public class ServerSideHandler extends SideHandler {
         final String key = this.packConfig.get("server.cakey");
         final String servername = this.packConfig.get("server.name");
         final int port = this.packConfig.get("server.port");
+        final String packFile = this.packConfig.get("server.packfile");
 		
-        LOGGER.debug("Configuration: Certificate {}, Key {}, servername {}, port {}", certificate, key, servername, port);
+        LOGGER.debug("Configuration: Certificate {}, Key {}, servername {}, port {}, packFile {}", certificate, key, servername, port, packFile);
         
-        if(Utils.isBlank(certificate) || Utils.isBlank(key) || Utils.isBlank(servername) || port <= 0) {
+        if(Utils.isBlank(certificate, key, servername, packFile) || port <= 0) {
             LOGGER.fatal("Invalid configuration for Server Curse Manager found: {}, please delete or correct before trying again", this.packConfig.getNioPath());
 			throw new IllegalStateException("Invalid Configuration");
 		}
@@ -56,7 +56,7 @@ public class ServerSideHandler extends SideHandler {
 
 	@Override
 	public boolean isValid() {
-		return Files.exists(this.getServerpackFolder().resolve("pack.json"));
+		return Files.exists(this.getServerpackFolder().resolve(this.packConfig.<String>get("server.packfile")));
 	}
 
 	@Override
@@ -64,7 +64,7 @@ public class ServerSideHandler extends SideHandler {
 		super.initialize();
 		
 		// load modpack config
-		JsonObject packConfig = Utils.loadJson(getServerpackFolder().resolve("pack.json")).getAsJsonObject();
+		JsonObject packConfig = Utils.loadJson(getServerpackFolder().resolve(this.packConfig.<String>get("server.packfile"))).getAsJsonObject();
 
 		if(!packConfig.has("mods") || !packConfig.get("mods").isJsonArray()) {
 			LOGGER.error("pack configuration for Server Curse Manager is missing mods list");

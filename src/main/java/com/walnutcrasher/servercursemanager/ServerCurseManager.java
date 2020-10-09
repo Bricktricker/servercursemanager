@@ -69,7 +69,7 @@ public class ServerCurseManager implements IModLocator {
 		finalModList.add(packutil);
 
 		ModAccessor.statusLine = "ServerPack: " + sideHandler.getStatus();		
-		LOGGER.info(ModAccessor.statusLine);
+		LOGGER.debug(ModAccessor.statusLine);
 
 		sideHandler.doCleanup();
 		return finalModList;

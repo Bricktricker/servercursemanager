@@ -90,8 +90,13 @@ public class Utils {
         }
     }
 	
-	public static boolean isBlank(String s) {
-		return s == null || s.trim().isEmpty();
+	public static boolean isBlank(String... strings) {
+		for(String s : strings) {
+			if(s == null || s.trim().isEmpty()) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 }

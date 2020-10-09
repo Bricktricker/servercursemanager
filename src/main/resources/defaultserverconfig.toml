@@ -8,3 +8,5 @@ port = 8080
 cacertificate = "cacert.pem"
 # Path to store the CA private key we will generate
 cakey = "ca.key"
+# The file in the 'serverpack' folder that specifies the loaded mods
+packfile = "pack.json"

@@ -31,7 +31,6 @@ public class ClientSideHandler extends SideHandler {
 
 	public ClientSideHandler(Path gameDir) {
 		super(gameDir);
-
 		this.certManager = new ClientCertificateManager(this.packConfig, this.getServerpackFolder(), LaunchEnvironmentHandler.INSTANCE.getUUID());
 	}
 	
@@ -55,13 +54,13 @@ public class ClientSideHandler extends SideHandler {
             throw new IllegalStateException("Offline play not supported");
         }
 		
-		String certificate = this.packConfig.<String>get("client.certificate");
-		String key = this.packConfig.<String>get("client.key");
-		String remoteServer = this.packConfig.<String>get("client.remoteServer");
+		final String certificate = this.packConfig.get("client.certificate");
+		final String key = this.packConfig.get("client.key");
+		final String remoteServer = this.packConfig.get("client.remoteServer");
 		
 		LOGGER.debug("Configuration: Certificate {}, Key {}, remoteServer {}", certificate, key, remoteServer);
 		
-		if(Utils.isBlank(certificate) || Utils.isBlank(key) || Utils.isBlank(remoteServer)) {
+		if(Utils.isBlank(certificate, key, remoteServer)) {
             LOGGER.fatal("Invalid configuration for Server Curse Manager found: {}, please delete or correct before trying again", this.packConfig.getNioPath());
 			throw new IllegalStateException("Invalid Configuration");
 		}
@@ -131,9 +130,7 @@ public class ClientSideHandler extends SideHandler {
 								});
 							
 							if(mapping != null) {
-								singleExcecutor.submit(() -> {
-									this.loadedModNames.add(mapping.getFileName());
-								});
+								singleExcecutor.submit(() -> this.loadedModNames.add(mapping.getFileName()));
 							}
 						
 					});
