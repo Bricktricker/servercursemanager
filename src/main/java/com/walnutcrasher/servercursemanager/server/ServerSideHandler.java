@@ -6,11 +6,15 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
+
+import org.apache.commons.lang3.tuple.Pair;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -164,21 +168,57 @@ public class ServerSideHandler extends SideHandler {
 				String target = additionalFile.getAsJsonPrimitive("target").getAsString();
 				
 				Path filePath = Paths.get(file);
-				if(!Files.isRegularFile(filePath) || !Files.exists(filePath)) {
+				boolean isFile = Files.isRegularFile(filePath);
+				if(!isFile && !Files.isDirectory(filePath) && !Files.exists(filePath)) {
 					LOGGER.error("additional file {} does not point to a file", filePath);
 					continue;
 				}
 				
-				singleExcecutor.submit(() -> {
-					ZipEntry entry = Utils.getStableEntry(SideHandler.ADDITIONAL + "/" + target);
+				List<Pair<Path, String>> filesToCopy = new ArrayList<>();
+				if(!isFile) {
+					if(!target.endsWith("/")) {
+						LOGGER.error("{} points to a folder but {} is not. 'target' has to end in a '/'", file, target);
+						continue;
+					}
+					
 					try {
-						zos.putNextEntry(entry);
-						Files.copy(filePath, zos);
-						zos.closeEntry();
-						manifestAdditional.add(target);
+						Files.walk(filePath)
+							.filter(p -> Files.isRegularFile(p))
+							.forEach(p -> {
+								Path relPath = filePath.relativize(p);
+								Path relTarget = Paths.get(target).resolve(relPath).normalize();
+								
+								//Custom build target string, to use '/' seperator
+								StringBuilder s = new StringBuilder();
+								for(Path folder : relTarget.getParent()) {
+									s.append(folder.toString());
+									s.append("/");
+								}
+								s.append(relTarget.getFileName());
+								
+								filesToCopy.add(Pair.of(p, s.toString()));
+							});
 					}catch(IOException e) {
 						LOGGER.catching(e);
-						return;
+					}
+					
+				}else {
+					filesToCopy.add(Pair.of(filePath, target));
+				}
+				
+				singleExcecutor.submit(() -> {
+					for(Pair<Path, String> p : filesToCopy) {
+						String pathInZip = SideHandler.ADDITIONAL + "/" + p.getRight();
+						LOGGER.debug("Adding additional file {} as target {}, stored as {} to modpack", p.getLeft().toString(), p.getRight(), pathInZip);
+						ZipEntry entry = Utils.getStableEntry(pathInZip);
+						try {
+							zos.putNextEntry(entry);
+							Files.copy(p.getLeft(), zos);
+							zos.closeEntry();
+							manifestAdditional.add(p.getRight());
+						}catch(IOException e) {
+							LOGGER.catching(e);
+						}	
 					}
 				});
 			}
