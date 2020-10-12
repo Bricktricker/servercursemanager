@@ -70,7 +70,7 @@ public class ServerSideHandler extends SideHandler {
 		// load modpack config
 		JsonObject packConfig = Utils.loadJson(getServerpackFolder().resolve(this.packConfig.<String>get("server.packfile"))).getAsJsonObject();
 
-		if(!packConfig.has("mods") || !packConfig.get("mods").isJsonArray()) {
+		if(!packConfig.has("files") || !packConfig.get("files").isJsonArray()) {
 			LOGGER.error("pack configuration for Server Curse Manager is missing mods list");
 			throw new IllegalArgumentException("mods not specified in modpack configuration");
 		}
@@ -84,7 +84,7 @@ public class ServerSideHandler extends SideHandler {
 		//containing all mod objects that get saved in the manifest.json file in the modpack zip
 		final JsonArray manifestMods = new JsonArray();
 
-		JsonArray mods = packConfig.getAsJsonArray("mods");
+		JsonArray mods = packConfig.getAsJsonArray("files");
 		for(JsonElement modE : mods) {
 			final JsonObject mod = modE.getAsJsonObject();
 
