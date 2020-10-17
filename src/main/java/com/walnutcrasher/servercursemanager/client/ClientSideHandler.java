@@ -141,14 +141,19 @@ public class ClientSideHandler extends SideHandler {
 				}
 			}
 
+			boolean overwriteAll = "overwrite".equalsIgnoreCase(manifest.getAsJsonPrimitive("copyOption").getAsString());
 			JsonArray additional = manifest.getAsJsonArray(SideHandler.ADDITIONAL);
 			for(JsonElement fileE : additional) {
 				String file = fileE.getAsJsonPrimitive().getAsString();
 				ZipEntry fileEntry = zf.getEntry(SideHandler.ADDITIONAL + "/" + file);
 				Path destination = LaunchEnvironmentHandler.INSTANCE.getGameDir().resolve(file);
 				Files.createDirectories(destination.getParent());
-				Files.copy(zf.getInputStream(fileEntry), destination, StandardCopyOption.REPLACE_EXISTING);
-				LOGGER.debug("Copied additional file to {}", destination.toString());
+				if(overwriteAll || !Files.exists(destination)) {
+					Files.copy(zf.getInputStream(fileEntry), destination, StandardCopyOption.REPLACE_EXISTING);
+					LOGGER.debug("Copied additional file to {}", destination.toString());
+				}else {
+					LOGGER.debug("Skipped writing additional file {}, because it already exists", destination.toString());
+				}
 			}
 
 		}catch(IOException e) {

@@ -89,7 +89,7 @@ public class ServerSideHandler extends SideHandler {
 			final JsonObject mod = modE.getAsJsonObject();
 
 			final String source = mod.getAsJsonPrimitive("source").getAsString();
-			if("curse".equals(source)) {
+			if("curse".equalsIgnoreCase(source)) {
 				int projectID = mod.getAsJsonPrimitive("projectID").getAsInt();
 				int fileID = mod.getAsJsonPrimitive("fileID").getAsInt();
 
@@ -115,7 +115,7 @@ public class ServerSideHandler extends SideHandler {
 					}
 				});
 
-			}else if("local".equals(source)) {
+			}else if("local".equalsIgnoreCase(source)) {
 				String modPath = mod.getAsJsonPrimitive("mod").getAsString();
 				Path sourcePath = Paths.get(modPath);
 				String modName = sourcePath.getFileName().toString();
@@ -238,6 +238,8 @@ public class ServerSideHandler extends SideHandler {
 		JsonObject manifest = new JsonObject();
 		manifest.add("mods", manifestMods);
 		manifest.add(SideHandler.ADDITIONAL, manifestAdditional);
+		String copyOption = packConfig.has("copyOption") ? packConfig.getAsJsonPrimitive("copyOption").getAsString() : "overwrite";
+		manifest.addProperty("copyOption", copyOption);
 		
 		try {
 			ZipEntry manifestEntry = Utils.getStableEntry("manifest.json");
