@@ -25,12 +25,11 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 /**
- * Copied from https://github.com/cpw/serverpacklocator/blob/e0e101c8db9008e7b9f9c8e0841fa92bf69ffcdb/src/main/java/cpw/mods/forge/serverpacklocator/cert/CertificateManager.java
+ * Copied from https://github.com/cpw/serverpacklocator/blob/02276cdc135e0245c5c8b8af323ece419a150781/src/main/java/cpw/mods/forge/serverpacklocator/cert/CertificateManager.java
  * @author cpw
  *
  * Changes:
  * Removed unused import and unused fields
- * Added changes from PR https://github.com/cpw/serverpacklocator/pull/6
  */
 public class CertificateManager {
     private static final Logger LOGGER = LogManager.getLogger();
