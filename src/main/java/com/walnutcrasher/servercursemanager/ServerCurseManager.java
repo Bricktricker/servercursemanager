@@ -55,7 +55,7 @@ public class ServerCurseManager implements IModLocator {
 		if(!sideHandler.isValid()) {
 			return new ArrayList<>();
 		}
-		
+
 		final List<IModFile> modFiles = dirLocator.scanMods();
 		final IModFile packutil = modFiles.stream()
 				.filter(modFile -> "serverpackutility.jar".equals(modFile.getFileName()))
@@ -68,7 +68,7 @@ public class ServerCurseManager implements IModLocator {
 
 		finalModList.add(packutil);
 
-		ModAccessor.statusLine = "ServerPack: " + sideHandler.getStatus();		
+		ModAccessor.statusLine = "ServerPack: " + sideHandler.getStatus();
 		LOGGER.debug(ModAccessor.statusLine);
 
 		sideHandler.doCleanup();

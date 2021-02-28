@@ -19,6 +19,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.walnutcrasher.servercursemanager.CopyOption;
 import com.walnutcrasher.servercursemanager.CurseDownloader;
 import com.walnutcrasher.servercursemanager.SideHandler;
 import com.walnutcrasher.servercursemanager.Utils;
@@ -36,28 +37,31 @@ public class ServerSideHandler extends SideHandler {
 		super(gameDir);
 		this.certManager = new ServerCertificateManager(packConfig, packConfig.getNioPath().getParent());
 	}
-	
+
 	@Override
 	protected String getConfigFile() {
 		return "/defaultserverconfig.toml";
 	}
-	
+
 	@Override
 	protected void validateConfig() {
 		final String certificate = this.packConfig.get("server.cacertificate");
-        final String key = this.packConfig.get("server.cakey");
-        final String servername = this.packConfig.get("server.name");
-        final int port = this.packConfig.get("server.port");
-        final String packFile = this.packConfig.get("server.packfile");
-		
-        LOGGER.debug("Configuration: Certificate {}, Key {}, servername {}, port {}, packFile {}", certificate, key, servername, port, packFile);
-        
-        if(Utils.isBlank(certificate, key, servername, packFile) || port <= 0) {
-            LOGGER.fatal("Invalid configuration for Server Curse Manager found: {}, please delete or correct before trying again", this.packConfig.getNioPath());
+		final String key = this.packConfig.get("server.cakey");
+		final String servername = this.packConfig.get("server.name");
+		final int port = this.packConfig.get("server.port");
+		final String packFile = this.packConfig.get("server.packfile");
+
+		LOGGER.debug("Configuration: Certificate {}, Key {}, servername {}, port {}, packFile {}", certificate, key, servername, port, packFile);
+
+		if(Utils.isBlank(certificate, key, servername, packFile) || port <= 0) {
+			LOGGER.fatal("Invalid configuration for Server Curse Manager found: {}, please delete or correct before trying again", this.packConfig.getNioPath());
 			throw new IllegalStateException("Invalid Configuration");
 		}
 	}
 
+	/**
+	 * Checks if the pack file, specified in the server.packfile config key exists
+	 */
 	@Override
 	public boolean isValid() {
 		return Files.exists(this.getServerpackFolder().resolve(this.packConfig.<String>get("server.packfile")));
@@ -66,11 +70,11 @@ public class ServerSideHandler extends SideHandler {
 	@Override
 	public void initialize() {
 		super.initialize();
-		
+
 		// load modpack config
 		JsonObject packConfig = Utils.loadJson(getServerpackFolder().resolve(this.packConfig.<String>get("server.packfile"))).getAsJsonObject();
 
-		if(!packConfig.has("files") || !packConfig.get("files").isJsonArray()) {
+		if(!packConfig.has(SideHandler.MODS) || !packConfig.get(SideHandler.MODS).isJsonArray()) {
 			LOGGER.error("pack configuration for Server Curse Manager is missing mods list");
 			throw new IllegalArgumentException("mods not specified in modpack configuration");
 		}
@@ -80,11 +84,12 @@ public class ServerSideHandler extends SideHandler {
 
 		ByteArrayOutputStream baos = new ByteArrayOutputStream();
 		ZipOutputStream zos = new ZipOutputStream(baos);
-		
-		//containing all mod objects that get saved in the manifest.json file in the modpack zip
+
+		// containing all mod objects that get saved in the manifest.json file in the
+		// modpack zip
 		final JsonArray manifestMods = new JsonArray();
 
-		JsonArray mods = packConfig.getAsJsonArray("files");
+		JsonArray mods = packConfig.getAsJsonArray(SideHandler.MODS);
 		for(JsonElement modE : mods) {
 			final JsonObject mod = modE.getAsJsonObject();
 
@@ -94,19 +99,18 @@ public class ServerSideHandler extends SideHandler {
 				int fileID = mod.getAsJsonPrimitive("fileID").getAsInt();
 
 				executorService.execute(() -> {
-					ModMapping mapping = this.getMapping(projectID, fileID)
-						.orElseGet(() -> {
-							try {
-								LOGGER.debug("Downloading curse file {} for project {}", fileID, projectID);
-								ModMapping m = CurseDownloader.downloadMod(projectID, fileID, getServermodsFolder());
-								this.addMapping(m);
-								return m;
-							}catch(IOException e) {
-								LOGGER.catching(e);
-								return null;
-							}
-						});
-					
+					ModMapping mapping = this.getMapping(projectID, fileID).orElseGet(() -> {
+						try {
+							LOGGER.debug("Downloading curse file {} for project {}", fileID, projectID);
+							ModMapping m = CurseDownloader.downloadMod(projectID, fileID, getServermodsFolder());
+							this.addMapping(m);
+							return m;
+						}catch(IOException e) {
+							LOGGER.catching(e);
+							return null;
+						}
+					});
+
 					if(mapping != null) {
 						singleExcecutor.submit(() -> {
 							manifestMods.add(mod);
@@ -131,11 +135,11 @@ public class ServerSideHandler extends SideHandler {
 						LOGGER.catching(e);
 						return;
 					}
-					
+
 					JsonObject modManifest = new JsonObject();
 					modManifest.addProperty("source", source);
 					modManifest.addProperty("file", modName);
-					
+
 					singleExcecutor.submit(() -> {
 						ZipEntry entry = Utils.getStableEntry("mods/" + modName);
 						try {
@@ -146,7 +150,7 @@ public class ServerSideHandler extends SideHandler {
 							LOGGER.catching(e);
 							return;
 						}
-						
+
 						manifestMods.add(modManifest);
 						this.loadedModNames.add(modName);
 					});
@@ -156,56 +160,54 @@ public class ServerSideHandler extends SideHandler {
 				continue;
 			}
 		}
-		
+
 		JsonArray manifestAdditional = new JsonArray();
-		//gather aditional files
+		// gather aditional files
 		if(packConfig.has(SideHandler.ADDITIONAL)) {
 			JsonArray additional = packConfig.getAsJsonArray(SideHandler.ADDITIONAL);
 			for(JsonElement fileE : additional) {
 				JsonObject additionalFile = fileE.getAsJsonObject();
-				
+
 				String file = additionalFile.getAsJsonPrimitive("file").getAsString();
 				String target = additionalFile.getAsJsonPrimitive("target").getAsString();
-				
+
 				Path filePath = Paths.get(file);
 				boolean isFile = Files.isRegularFile(filePath);
 				if(!isFile && !Files.isDirectory(filePath) && !Files.exists(filePath)) {
 					LOGGER.error("additional file {} does not point to a file", filePath);
 					continue;
 				}
-				
+
 				List<Pair<Path, String>> filesToCopy = new ArrayList<>();
 				if(!isFile) {
 					if(!target.endsWith("/")) {
 						LOGGER.error("{} points to a folder but {} is not. 'target' has to end in a '/'", file, target);
 						continue;
 					}
-					
+
 					try {
-						Files.walk(filePath)
-							.filter(p -> Files.isRegularFile(p))
-							.forEach(p -> {
-								Path relPath = filePath.relativize(p);
-								Path relTarget = Paths.get(target).resolve(relPath).normalize();
-								
-								//Custom build target string, to use '/' seperator
-								StringBuilder s = new StringBuilder();
-								for(Path folder : relTarget.getParent()) {
-									s.append(folder.toString());
-									s.append("/");
-								}
-								s.append(relTarget.getFileName());
-								
-								filesToCopy.add(Pair.of(p, s.toString()));
-							});
+						Files.walk(filePath).filter(p -> Files.isRegularFile(p)).forEach(p -> {
+							Path relPath = filePath.relativize(p);
+							Path relTarget = Paths.get(target).resolve(relPath).normalize();
+
+							// Custom build target string, to use '/' seperator
+							StringBuilder s = new StringBuilder();
+							for(Path folder : relTarget.getParent()) {
+								s.append(folder.toString());
+								s.append("/");
+							}
+							s.append(relTarget.getFileName());
+
+							filesToCopy.add(Pair.of(p, s.toString()));
+						});
 					}catch(IOException e) {
 						LOGGER.catching(e);
 					}
-					
+
 				}else {
 					filesToCopy.add(Pair.of(filePath, target));
 				}
-				
+
 				singleExcecutor.submit(() -> {
 					for(Pair<Path, String> p : filesToCopy) {
 						String pathInZip = SideHandler.ADDITIONAL + "/" + p.getRight();
@@ -218,7 +220,7 @@ public class ServerSideHandler extends SideHandler {
 							manifestAdditional.add(p.getRight());
 						}catch(IOException e) {
 							LOGGER.catching(e);
-						}	
+						}
 					}
 				});
 			}
@@ -227,7 +229,7 @@ public class ServerSideHandler extends SideHandler {
 		executorService.shutdown();
 		try {
 			executorService.awaitTermination(2, TimeUnit.HOURS);
-			
+
 			singleExcecutor.shutdown();
 			singleExcecutor.awaitTermination(2, TimeUnit.HOURS);
 		}catch(InterruptedException e) {
@@ -236,30 +238,30 @@ public class ServerSideHandler extends SideHandler {
 
 		// create modpack zip
 		JsonObject manifest = new JsonObject();
-		manifest.add("mods", manifestMods);
+		manifest.add(SideHandler.MODS, manifestMods);
 		manifest.add(SideHandler.ADDITIONAL, manifestAdditional);
-		String copyOption = packConfig.has("copyOption") ? packConfig.getAsJsonPrimitive("copyOption").getAsString() : "overwrite";
-		manifest.addProperty("copyOption", copyOption);
-		
+		CopyOption copyOption = packConfig.has("copyOption") ? CopyOption.getOption(packConfig.getAsJsonPrimitive("copyOption").getAsString()) : CopyOption.OVERWRITE;
+		manifest.addProperty("copyOption", copyOption.configName());
+
 		try {
 			ZipEntry manifestEntry = Utils.getStableEntry("manifest.json");
 			zos.putNextEntry(manifestEntry);
 			Utils.saveJson(manifest, zos);
 			zos.closeEntry();
-			zos.close(); //Close pack zip
+			zos.close(); // Close pack zip
 		}catch(IOException e) {
 			LOGGER.catching(e);
 			return;
 		}
-		
+
 		byte[] packData = baos.toByteArray();
 		this.httpServer = new SimpleHttpServer(this, packData);
 	}
-	
+
 	public ServerCertificateManager getCertificateManager() {
 		return this.certManager;
 	}
-	
+
 	public int getPort() {
 		return this.packConfig.get("server.port");
 	}

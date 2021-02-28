@@ -68,6 +68,7 @@ public class RequestHandler extends SimpleChannelInboundHandler<FullHttpRequest>
 		}
 	}
 
+	@SuppressWarnings("deprecation") //X509Certificate got deprecated in Java 9
 	@Override
 	public void userEventTriggered(final ChannelHandlerContext ctx, final Object evt) throws Exception {
 		if(evt instanceof SslHandshakeCompletionEvent) {

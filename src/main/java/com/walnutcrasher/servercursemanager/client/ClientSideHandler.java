@@ -14,6 +14,7 @@ import java.util.zip.ZipFile;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.walnutcrasher.servercursemanager.CopyOption;
 import com.walnutcrasher.servercursemanager.CurseDownloader;
 import com.walnutcrasher.servercursemanager.SideHandler;
 import com.walnutcrasher.servercursemanager.Utils;
@@ -26,14 +27,14 @@ public class ClientSideHandler extends SideHandler {
 
 	private ClientCertificateManager certManager;
 	private SimpleHttpClient httpClient;
-	
+
 	private String status = "";
 
 	public ClientSideHandler(Path gameDir) {
 		super(gameDir);
 		this.certManager = new ClientCertificateManager(this.packConfig, this.getServerpackFolder(), LaunchEnvironmentHandler.INSTANCE.getUUID());
 	}
-	
+
 	@Override
 	protected String getConfigFile() {
 		return "/defaultclientconfig.toml";
@@ -43,25 +44,25 @@ public class ClientSideHandler extends SideHandler {
 	public boolean isValid() {
 		return this.certManager.isValid();
 	}
-	
+
 	@Override
 	protected void validateConfig() {
 		final String uuid = LaunchEnvironmentHandler.INSTANCE.getUUID();
-        if (uuid == null || uuid.length() == 0) {
-            // invalid UUID - probably offline mode. not supported
-            LaunchEnvironmentHandler.INSTANCE.addProgressMessage("NO UUID found. Offline mode does not work. No server mods will be downloaded");
-            LOGGER.error("There was not a valid UUID present in this client launch. You are probably playing offline mode. Trivially, there is nothing for us to do.");
-            throw new IllegalStateException("Offline play not supported");
-        }
-		
+		if(uuid == null || uuid.length() == 0) {
+			// invalid UUID - probably offline mode. not supported
+			LaunchEnvironmentHandler.INSTANCE.addProgressMessage("NO UUID found. Offline mode does not work. No server mods will be downloaded");
+			LOGGER.error("There was not a valid UUID present in this client launch. You are probably playing offline mode. Trivially, there is nothing for us to do.");
+			throw new IllegalStateException("Offline play not supported");
+		}
+
 		final String certificate = this.packConfig.get("client.certificate");
 		final String key = this.packConfig.get("client.key");
 		final String remoteServer = this.packConfig.get("client.remoteServer");
-		
+
 		LOGGER.debug("Configuration: Certificate {}, Key {}, remoteServer {}", certificate, key, remoteServer);
-		
+
 		if(Utils.isBlank(certificate, key, remoteServer)) {
-            LOGGER.fatal("Invalid configuration for Server Curse Manager found: {}, please delete or correct before trying again", this.packConfig.getNioPath());
+			LOGGER.fatal("Invalid configuration for Server Curse Manager found: {}, please delete or correct before trying again", this.packConfig.getNioPath());
 			throw new IllegalStateException("Invalid Configuration");
 		}
 	}
@@ -84,9 +85,10 @@ public class ClientSideHandler extends SideHandler {
 		}catch(ExecutionException e) {
 			LOGGER.catching(e);
 		}
-		
+
 		if(!downloadSuccessful) {
-			//If this is the first start and no modpack is available, it's getting overwritten in the next block
+			// If this is the first start and no modpack is available, it's getting
+			// overwritten in the next block
 			this.status = "Using old Modpack version";
 		}else {
 			this.status = "Using latest Modpack version";
@@ -106,7 +108,7 @@ public class ClientSideHandler extends SideHandler {
 			ZipEntry manifestEntry = zf.getEntry("manifest.json");
 			JsonObject manifest = Utils.loadJson(zf.getInputStream(manifestEntry)).getAsJsonObject();
 
-			JsonArray mods = manifest.getAsJsonArray("mods");
+			JsonArray mods = manifest.getAsJsonArray(SideHandler.MODS);
 			for(JsonElement modE : mods) {
 				JsonObject mod = modE.getAsJsonObject();
 				final String source = mod.getAsJsonPrimitive("source").getAsString();
@@ -114,24 +116,23 @@ public class ClientSideHandler extends SideHandler {
 					int projectID = mod.getAsJsonPrimitive("projectID").getAsInt();
 					int fileID = mod.getAsJsonPrimitive("fileID").getAsInt();
 
-					executorService.execute(() -> {						
-						ModMapping mapping = this.getMapping(projectID, fileID)
-								.orElseGet(() -> {
-									try {
-										LOGGER.debug("Downloading curse file {} for project {}", fileID, projectID);
-										ModMapping m = CurseDownloader.downloadMod(projectID, fileID, getServermodsFolder());
-										this.addMapping(m);
-										return m;
-									}catch(IOException e) {
-										LOGGER.catching(e);
-										return null;
-									}
-								});
-							
-							if(mapping != null) {
-								singleExcecutor.submit(() -> this.loadedModNames.add(mapping.getFileName()));
+					executorService.execute(() -> {
+						ModMapping mapping = this.getMapping(projectID, fileID).orElseGet(() -> {
+							try {
+								LOGGER.debug("Downloading curse file {} for project {}", fileID, projectID);
+								ModMapping m = CurseDownloader.downloadMod(projectID, fileID, getServermodsFolder());
+								this.addMapping(m);
+								return m;
+							}catch(IOException e) {
+								LOGGER.catching(e);
+								return null;
 							}
-						
+						});
+
+						if(mapping != null) {
+							singleExcecutor.submit(() -> this.loadedModNames.add(mapping.getFileName()));
+						}
+
 					});
 				}else if("local".equals(source)) {
 					String filename = mod.getAsJsonPrimitive("file").getAsString();
@@ -141,14 +142,14 @@ public class ClientSideHandler extends SideHandler {
 				}
 			}
 
-			boolean overwriteAll = "overwrite".equalsIgnoreCase(manifest.getAsJsonPrimitive("copyOption").getAsString());
+			CopyOption copyOption = CopyOption.getOption(manifest.getAsJsonPrimitive("copyOption").getAsString());
 			JsonArray additional = manifest.getAsJsonArray(SideHandler.ADDITIONAL);
 			for(JsonElement fileE : additional) {
 				String file = fileE.getAsJsonPrimitive().getAsString();
 				ZipEntry fileEntry = zf.getEntry(SideHandler.ADDITIONAL + "/" + file);
 				Path destination = LaunchEnvironmentHandler.INSTANCE.getGameDir().resolve(file);
 				Files.createDirectories(destination.getParent());
-				if(overwriteAll || !Files.exists(destination)) {
+				if(copyOption.writeFile(destination)) {
 					Files.copy(zf.getInputStream(fileEntry), destination, StandardCopyOption.REPLACE_EXISTING);
 					LOGGER.debug("Copied additional file to {}", destination.toString());
 				}else {
@@ -163,17 +164,15 @@ public class ClientSideHandler extends SideHandler {
 			try {
 				executorService.shutdown();
 				executorService.awaitTermination(2, TimeUnit.HOURS);
-				
+
 				singleExcecutor.shutdown();
 				singleExcecutor.awaitTermination(2, TimeUnit.HOURS);
 			}catch(InterruptedException e) {
 			}
 		}
-		
-		
 
 	}
-	
+
 	public String getRemoteServer() {
 		return this.packConfig.get("client.remoteServer");
 	}
@@ -184,7 +183,7 @@ public class ClientSideHandler extends SideHandler {
 		this.httpClient = null;
 		this.certManager = null;
 	}
-	
+
 	@Override
 	public String getStatus() {
 		return this.status;

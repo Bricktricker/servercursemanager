@@ -1,28 +1,26 @@
-apply plugin: 'maven'
 apply plugin: 'maven-publish'
 apply plugin: 'java-library'
 
 group 'com.walnutcrasher'
 
-sourceCompatibility = 1.8
-targetCompatibility = 1.8
+targetCompatibility = sourceCompatibility = compileJava.sourceCompatibility = compileJava.targetCompatibility = JavaVersion.VERSION_1_8
 
 repositories {
     mavenCentral()
     mavenLocal()
     maven {
         name = "forge"
-        url = "http://files.minecraftforge.net/maven"
+        url = "https://files.minecraftforge.net/maven"
     }
 }
 project.version = "1.0.0"
 
-ext.forge_version = "34.1.11"
+ext.forge_version = "36.0.43"
 
 ext.sharedManifest = manifest {
     attributes(['Class-Path': 'forge.jar',
      'Main-Class': 'net.minecraftforge.server.ServerMain',
-     'ServerLaunchArgs': "--gameDir . --launchTarget fmlserver --fml.forgeVersion ${forge_version} --fml.mcpVersion 20190829.143755 --fml.mcVersion 1.16.3 --fml.forgeGroup net.minecraftforge"
+     'ServerLaunchArgs': "--gameDir . --launchTarget fmlserver --fml.forgeVersion ${forge_version} --fml.mcpVersion 20190829.143755 --fml.mcVersion 1.16.5 --fml.forgeGroup net.minecraftforge"
     ],
     )
     attributes(
@@ -51,8 +49,8 @@ task sourcesJar(type: Jar) {
 
 
 dependencies {
-	implementation("cpw.mods:modlauncher:7.0.+")
-	implementation("net.minecraftforge:forgespi:3.1.+")
+	implementation("cpw.mods:modlauncher:8.0.+")
+	implementation("net.minecraftforge:forgespi:3.2.+")
 	implementation("com.electronwill.night-config:core:3.6.2")
     implementation("com.electronwill.night-config:toml:3.6.2")
     implementation("com.google.code.gson:gson:2.8.0")
@@ -64,12 +62,12 @@ dependencies {
 task zip(type: Zip, dependsOn: jar) {
     archiveClassifier = "bundle"
     from (jar.outputs) { into ("libraries/com/walnutcrasher/servercursemanager/${project.version}/") }
-    from (file("1.16.3-servercursemanager.json")) {
+    from (file("1.16.5-servercursemanager.json")) {
         filter { line -> line
                 .replace('@version@', "${project.version}")
                 .replace('@forgeversion@', "${forge_version}")
         }
-        into ("versions/1.16.3-servercursemanager/")
+        into ("versions/1.16.5-servercursemanager/")
     }
 }
 
