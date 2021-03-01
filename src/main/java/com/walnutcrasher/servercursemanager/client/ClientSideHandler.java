@@ -102,7 +102,7 @@ public class ClientSideHandler extends SideHandler {
 			return;
 		}
 
-		final ExecutorService executorService = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors() / 2);
+		final ExecutorService downloadThreadpool = Executors.newFixedThreadPool(Math.max(Runtime.getRuntime().availableProcessors() / 2, 1));
 		final ExecutorService singleExcecutor = Executors.newSingleThreadExecutor();
 
 		try(ZipFile zf = new ZipFile(modpackZip.toFile())) {
@@ -117,7 +117,7 @@ public class ClientSideHandler extends SideHandler {
 					int projectID = mod.getAsJsonPrimitive("projectID").getAsInt();
 					int fileID = mod.getAsJsonPrimitive("fileID").getAsInt();
 
-					executorService.execute(() -> {
+					downloadThreadpool.execute(() -> {
 						ModMapping mapping = this.getMapping(projectID, fileID).orElseGet(() -> {
 							try {
 								LOGGER.debug("Downloading curse file {} for project {}", fileID, projectID);
@@ -163,8 +163,8 @@ public class ClientSideHandler extends SideHandler {
 			this.status = "Exception while loading modpack";
 		}finally {
 			try {
-				executorService.shutdown();
-				executorService.awaitTermination(2, TimeUnit.HOURS);
+				downloadThreadpool.shutdown();
+				downloadThreadpool.awaitTermination(2, TimeUnit.HOURS);
 
 				singleExcecutor.shutdown();
 				singleExcecutor.awaitTermination(2, TimeUnit.HOURS);
