@@ -52,19 +52,18 @@ public class ServerCurseManager implements IModLocator {
 
 	@Override
 	public List<IModFile> scanMods() {
-		if(!sideHandler.isValid()) {
-			return new ArrayList<>();
-		}
-
 		final List<IModFile> modFiles = dirLocator.scanMods();
 		final IModFile packutil = modFiles.stream()
 				.filter(modFile -> "serverpackutility.jar".equals(modFile.getFileName()))
 				.findFirst()
 				.orElseThrow(() -> new RuntimeException("Something went wrong with the internal utility mod"));
 
-		List<IModFile> finalModList = modFiles.stream()
+		List<IModFile> finalModList = new ArrayList<>();
+		if(sideHandler.isValid()) {
+			finalModList = modFiles.stream()
 				.filter(mf -> sideHandler.shouldLoadFile(mf.getFileName()))
-				.collect(Collectors.toCollection(() -> new ArrayList<>()));
+				.collect(Collectors.toCollection(() -> new ArrayList<>()));	
+		}
 
 		finalModList.add(packutil);
 

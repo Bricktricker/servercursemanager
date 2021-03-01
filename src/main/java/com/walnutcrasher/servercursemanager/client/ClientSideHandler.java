@@ -33,6 +33,7 @@ public class ClientSideHandler extends SideHandler {
 	public ClientSideHandler(Path gameDir) {
 		super(gameDir);
 		this.certManager = new ClientCertificateManager(this.packConfig, this.getServerpackFolder(), LaunchEnvironmentHandler.INSTANCE.getUUID());
+		this.status = "Not set up";
 	}
 
 	@Override
