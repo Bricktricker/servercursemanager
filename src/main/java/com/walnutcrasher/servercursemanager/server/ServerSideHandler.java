@@ -79,7 +79,7 @@ public class ServerSideHandler extends SideHandler {
 			throw new IllegalArgumentException("mods not specified in modpack configuration");
 		}
 
-		final ExecutorService executorService = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors() / 2);
+		final ExecutorService downloadThreadpool = Executors.newFixedThreadPool(Math.max(Runtime.getRuntime().availableProcessors() / 2, 1));
 		final ExecutorService singleExcecutor = Executors.newSingleThreadExecutor();
 
 		ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -98,7 +98,7 @@ public class ServerSideHandler extends SideHandler {
 				int projectID = mod.getAsJsonPrimitive("projectID").getAsInt();
 				int fileID = mod.getAsJsonPrimitive("fileID").getAsInt();
 
-				executorService.execute(() -> {
+				downloadThreadpool.execute(() -> {
 					ModMapping mapping = this.getMapping(projectID, fileID).orElseGet(() -> {
 						try {
 							LOGGER.debug("Downloading curse file {} for project {}", fileID, projectID);
@@ -124,7 +124,7 @@ public class ServerSideHandler extends SideHandler {
 				Path sourcePath = Paths.get(modPath);
 				String modName = sourcePath.getFileName().toString();
 
-				executorService.execute(() -> {
+				downloadThreadpool.execute(() -> {
 					if(!Files.isRegularFile(sourcePath) || !Files.exists(sourcePath)) {
 						LOGGER.error("mod path {} does not point to a file", modPath);
 						return;
@@ -226,9 +226,9 @@ public class ServerSideHandler extends SideHandler {
 			}
 		}
 
-		executorService.shutdown();
+		downloadThreadpool.shutdown();
 		try {
-			executorService.awaitTermination(2, TimeUnit.HOURS);
+			downloadThreadpool.awaitTermination(2, TimeUnit.HOURS);
 
 			singleExcecutor.shutdown();
 			singleExcecutor.awaitTermination(2, TimeUnit.HOURS);
