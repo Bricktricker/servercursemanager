@@ -1,10 +1,6 @@
 import json
 import sys
 
-#TODO: remove
-sys.argv.append("manifest.json")
-sys.argv.append("pack.json")
-
 def main(inFile, outFile):
     out = []
     with open(infile) as inF:
