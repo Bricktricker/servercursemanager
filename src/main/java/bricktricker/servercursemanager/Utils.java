@@ -1,4 +1,4 @@
-package com.walnutcrasher.servercursemanager;
+package bricktricker.servercursemanager;
 
 import java.io.IOException;
 import java.io.InputStream;

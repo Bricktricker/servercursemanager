@@ -1,4 +1,4 @@
-package com.walnutcrasher.servercursemanager.client;
+package bricktricker.servercursemanager.client;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -14,11 +14,11 @@ import java.util.zip.ZipFile;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import com.walnutcrasher.servercursemanager.CopyOption;
-import com.walnutcrasher.servercursemanager.CurseDownloader;
-import com.walnutcrasher.servercursemanager.SideHandler;
-import com.walnutcrasher.servercursemanager.Utils;
 
+import bricktricker.servercursemanager.CopyOption;
+import bricktricker.servercursemanager.CurseDownloader;
+import bricktricker.servercursemanager.SideHandler;
+import bricktricker.servercursemanager.Utils;
 import cpw.mods.forge.cursepacklocator.HashChecker;
 import cpw.mods.forge.serverpacklocator.LaunchEnvironmentHandler;
 import cpw.mods.forge.serverpacklocator.client.ClientCertificateManager;

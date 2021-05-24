@@ -1,4 +1,4 @@
-package com.walnutcrasher.servercursemanager.client;
+package bricktricker.servercursemanager.client;
 
 import cpw.mods.forge.serverpacklocator.LaunchEnvironmentHandler;
 import cpw.mods.forge.serverpacklocator.client.ClientCertificateManager;

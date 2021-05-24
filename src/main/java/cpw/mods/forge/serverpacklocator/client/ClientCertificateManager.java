@@ -1,8 +1,8 @@
 package cpw.mods.forge.serverpacklocator.client;
 
 import com.electronwill.nightconfig.core.file.FileConfig;
-import com.walnutcrasher.servercursemanager.Utils;
 
+import bricktricker.servercursemanager.Utils;
 import cpw.mods.forge.serverpacklocator.LaunchEnvironmentHandler;
 import cpw.mods.forge.serverpacklocator.cert.CertificateManager;
 import org.apache.logging.log4j.LogManager;

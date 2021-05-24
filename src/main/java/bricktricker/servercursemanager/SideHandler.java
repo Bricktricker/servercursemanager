@@ -1,4 +1,4 @@
-package com.walnutcrasher.servercursemanager;
+package bricktricker.servercursemanager;
 
 import java.nio.file.Files;
 import java.nio.file.Path;

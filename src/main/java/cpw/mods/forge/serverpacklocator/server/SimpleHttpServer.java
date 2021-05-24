@@ -13,8 +13,8 @@ import io.netty.handler.ssl.SslContextBuilder;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import com.walnutcrasher.servercursemanager.server.RequestHandler;
-import com.walnutcrasher.servercursemanager.server.ServerSideHandler;
+import bricktricker.servercursemanager.server.RequestHandler;
+import bricktricker.servercursemanager.server.ServerSideHandler;
 
 import javax.net.ssl.SSLException;
 import java.io.UncheckedIOException;

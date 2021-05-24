@@ -1,4 +1,4 @@
-package com.walnutcrasher.servercursemanager;
+package bricktricker.servercursemanager;
 
 import java.net.URI;
 import java.net.URL;
@@ -19,9 +19,8 @@ import java.util.stream.Collectors;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import com.walnutcrasher.servercursemanager.client.ClientSideHandler;
-import com.walnutcrasher.servercursemanager.server.ServerSideHandler;
-
+import bricktricker.servercursemanager.client.ClientSideHandler;
+import bricktricker.servercursemanager.server.ServerSideHandler;
 import cpw.mods.forge.serverpacklocator.LaunchEnvironmentHandler;
 import cpw.mods.forge.serverpacklocator.ModAccessor;
 import cpw.mods.modlauncher.api.LamdbaExceptionUtils;

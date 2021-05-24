@@ -1,4 +1,4 @@
-package com.walnutcrasher.servercursemanager.server;
+package bricktricker.servercursemanager.server;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;

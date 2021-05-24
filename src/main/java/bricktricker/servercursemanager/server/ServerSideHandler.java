@@ -1,4 +1,4 @@
-package com.walnutcrasher.servercursemanager.server;
+package bricktricker.servercursemanager.server;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -19,11 +19,11 @@ import org.apache.commons.lang3.tuple.Pair;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import com.walnutcrasher.servercursemanager.CopyOption;
-import com.walnutcrasher.servercursemanager.CurseDownloader;
-import com.walnutcrasher.servercursemanager.SideHandler;
-import com.walnutcrasher.servercursemanager.Utils;
 
+import bricktricker.servercursemanager.CopyOption;
+import bricktricker.servercursemanager.CurseDownloader;
+import bricktricker.servercursemanager.SideHandler;
+import bricktricker.servercursemanager.Utils;
 import cpw.mods.forge.serverpacklocator.server.ServerCertificateManager;
 import cpw.mods.forge.serverpacklocator.server.SimpleHttpServer;
 

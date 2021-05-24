@@ -1,4 +1,4 @@
-package com.walnutcrasher.servercursemanager;
+package bricktricker.servercursemanager;
 
 import java.io.IOException;
 import java.net.URL;
@@ -10,8 +10,8 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import com.google.gson.JsonObject;
-import com.walnutcrasher.servercursemanager.SideHandler.ModMapping;
 
+import bricktricker.servercursemanager.SideHandler.ModMapping;
 import cpw.mods.forge.cursepacklocator.HashChecker;
 
 public class CurseDownloader {

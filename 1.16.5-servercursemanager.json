@@ -10,7 +10,7 @@
   },
   "libraries": [
     {
-      "name": "com.walnutcrasher:servercursemanager:@version@"
+      "name": "bricktricker:servercursemanager:@version@"
     }
   ]
 }

@@ -1,21 +1,23 @@
-apply plugin: 'maven-publish'
-apply plugin: 'java-library'
+plugins {
+    id 'maven-publish'
+    id 'java-library'
+    id 'eclipse'
+}
 
-group 'com.walnutcrasher'
+group 'bricktricker'
+project.version = '1.0.0'
+ext.forge_version = '36.1.23'
 
 targetCompatibility = sourceCompatibility = compileJava.sourceCompatibility = compileJava.targetCompatibility = JavaVersion.VERSION_1_8
 
 repositories {
-    mavenCentral()
     mavenLocal()
+    mavenCentral()
     maven {
-        name = "forge"
-        url = "https://files.minecraftforge.net/maven"
+        name = 'forge'
+        url = 'https://files.minecraftforge.net/maven'
     }
 }
-project.version = "1.0.0"
-
-ext.forge_version = "36.0.43"
 
 ext.sharedManifest = manifest {
     attributes(['Class-Path': 'forge.jar',
@@ -24,22 +26,22 @@ ext.sharedManifest = manifest {
     ],
     )
     attributes(
-            ["Specification-Title"     : "servercursemanager",
-             "Specification-Vendor"    : "walnutcrasher",
-             "Specification-Version"   : "1",
-             "Implementation-Title"    : project.name,
-             "Implementation-Vendor"   : "walnutcrasher",
-             "Implementation-Version"  : "${version}",
-             "Implementation-Timestamp": new Date().format("yyyy-MM-dd'T'HH:mm:ssZ")],
-            "com/walnutcrasher/servercursemanager/")
+            ['Specification-Title'     : 'servercursemanager',
+             'Specification-Vendor'    : 'bricktricker',
+             'Specification-Version'   : '1',
+             'Implementation-Title'    : project.name,
+             'Implementation-Vendor'   : 'bricktricker',
+             'Implementation-Version'  : "${version}",
+             'Implementation-Timestamp': new Date().format("yyyy-MM-dd'T'HH:mm:ssZ")],
+            'bricktricker/servercursemanager/')
 }
 
 jar {
     manifest = project.manifest {
         from sharedManifest
     }
-    from "COPYRIGHT"
-    from "LICENSE"
+    from 'COPYRIGHT'
+    from 'LICENSE'
 }
 
 task sourcesJar(type: Jar) {
@@ -49,25 +51,25 @@ task sourcesJar(type: Jar) {
 
 
 dependencies {
-	implementation("cpw.mods:modlauncher:8.0.+")
-	implementation("net.minecraftforge:forgespi:3.2.+")
-	implementation("com.electronwill.night-config:core:3.6.2")
-    implementation("com.electronwill.night-config:toml:3.6.2")
-    implementation("com.google.code.gson:gson:2.8.0")
-    implementation("io.netty:netty-all:4.1.25.Final")
-    implementation("org.apache.logging.log4j:log4j-api:2.11.2")
-    implementation("org.apache.commons:commons-lang3:3.8.1")
+    implementation('cpw.mods:modlauncher:8.0.+')
+    implementation('net.minecraftforge:forgespi:3.2.+')
+    implementation('com.electronwill.night-config:core:3.6.3')
+    implementation('com.electronwill.night-config:toml:3.6.3')
+    implementation('com.google.code.gson:gson:2.8.0')
+    implementation('io.netty:netty-all:4.1.25.Final')
+    implementation('org.apache.logging.log4j:log4j-api:2.11.2')
+    implementation('org.apache.commons:commons-lang3:3.8.1')
 }
 
 task zip(type: Zip, dependsOn: jar) {
-    archiveClassifier = "bundle"
-    from (jar.outputs) { into ("libraries/com/walnutcrasher/servercursemanager/${project.version}/") }
-    from (file("1.16.5-servercursemanager.json")) {
+    archiveClassifier = 'bundle'
+    from (jar.outputs) { into ("libraries/bricktricker/servercursemanager/${project.version}/") }
+    from (file('1.16.5-servercursemanager.json')) {
         filter { line -> line
                 .replace('@version@', "${project.version}")
                 .replace('@forgeversion@', "${forge_version}")
         }
-        into ("versions/1.16.5-servercursemanager/")
+        into ('versions/1.16.5-servercursemanager/')
     }
 }
 
@@ -78,7 +80,7 @@ artifacts {
 }
 
 compileJava {
-    options.compilerArgs << "-XDignore.symbol.file"
+    options.compilerArgs << '-XDignore.symbol.file'
     options.fork = true
     options.forkOptions.executable = 'javac'
 }
