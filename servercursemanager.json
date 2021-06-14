@@ -1,10 +1,10 @@
 {
-  "id": "1.16.5-servercursemanager",
+  "id": "@mcversion@-servercursemanager",
   "time": "2019-09-01T18:46:04+00:00",
   "releaseTime": "2019-10-18T00:00:00+00:00",
   "type": "release",
   "mainClass": "cpw.mods.modlauncher.Launcher",
-  "inheritsFrom": "1.16.5-forge-@forgeversion@",
+  "inheritsFrom": "@mcversion@-forge-@forgeversion@",
   "logging": {
 
   },
