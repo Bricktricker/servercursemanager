@@ -173,6 +173,7 @@ public class ServerSideHandler extends SideHandler {
 		JsonArray manifestAdditional = new JsonArray();
 		// gather aditional files
 		if(packConfig.has(SideHandler.ADDITIONAL)) {
+			List<Pair<Path, String>> filesToCopy = new ArrayList<>();
 			JsonArray additional = packConfig.getAsJsonArray(SideHandler.ADDITIONAL);
 			for(JsonElement fileE : additional) {
 				JsonObject additionalFile = fileE.getAsJsonObject();
@@ -187,7 +188,6 @@ public class ServerSideHandler extends SideHandler {
 					continue;
 				}
 
-				List<Pair<Path, String>> filesToCopy = new ArrayList<>();
 				if(!isFile) {
 					if(!target.endsWith("/")) {
 						LOGGER.error("{} points to a folder but {} is not. 'target' has to end in a '/'", file, target);
@@ -206,8 +206,16 @@ public class ServerSideHandler extends SideHandler {
 								s.append("/");
 							}
 							s.append(relTarget.getFileName());
-
-							filesToCopy.add(Pair.of(p, s.toString()));
+							
+							String targetStr = s.toString();
+							
+							boolean allreadyPresent = filesToCopy.stream()
+								.map(Pair::getRight)
+								.anyMatch(x -> x.equals(targetStr));
+							
+							if(!allreadyPresent) {
+								filesToCopy.add(Pair.of(p, targetStr));
+							}
 						});
 					}catch(IOException e) {
 						LOGGER.catching(e);
@@ -216,25 +224,25 @@ public class ServerSideHandler extends SideHandler {
 				}else {
 					filesToCopy.add(Pair.of(filePath, target));
 				}
-				
-				CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
-					for(Pair<Path, String> p : filesToCopy) {
-						String pathInZip = SideHandler.ADDITIONAL + "/" + p.getRight();
-						LOGGER.debug("Adding additional file {} as target {}, stored as {} to modpack", p.getLeft().toString(), p.getRight(), pathInZip);
-						ZipEntry entry = Utils.getStableEntry(pathInZip);
-						try {
-							zos.putNextEntry(entry);
-							Files.copy(p.getLeft(), zos);
-							zos.closeEntry();
-							manifestAdditional.add(p.getRight());
-						}catch(IOException e) {
-							LOGGER.catching(e);
-						}
-					}
-				}, singleExcecutor);
-
-				futures.add(future);
 			}
+			
+			CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
+				for(Pair<Path, String> p : filesToCopy) {
+					String pathInZip = SideHandler.ADDITIONAL + "/" + p.getRight();
+					LOGGER.debug("Adding additional file {} as target {}, stored as {} to modpack", p.getLeft().toString(), p.getRight(), pathInZip);
+					ZipEntry entry = Utils.getStableEntry(pathInZip);
+					try {
+						zos.putNextEntry(entry);
+						Files.copy(p.getLeft(), zos);
+						zos.closeEntry();
+						manifestAdditional.add(p.getRight());
+					}catch(IOException e) {
+						LOGGER.catching(e);
+					}
+				}
+			}, singleExcecutor);
+
+			futures.add(future);
 		}
 		
 		CompletableFuture<Void> downloadTask = CompletableFuture.allOf(futures.toArray(new CompletableFuture[futures.size()]));
