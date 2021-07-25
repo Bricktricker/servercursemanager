@@ -51,6 +51,7 @@ public class ServerCurseManager implements IModLocator {
 
 	@Override
 	public List<IModFile> scanMods() {
+		this.sideHandler.waitForInstall();
 		final List<IModFile> modFiles = dirLocator.scanMods();
 		final IModFile packutil = modFiles.stream()
 				.filter(modFile -> "serverpackutility.jar".equals(modFile.getFileName()))

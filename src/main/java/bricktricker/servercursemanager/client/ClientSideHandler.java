@@ -4,10 +4,11 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
@@ -102,8 +103,9 @@ public class ClientSideHandler extends SideHandler {
 			return;
 		}
 
-		final ExecutorService downloadThreadpool = Executors.newFixedThreadPool(Math.max(Runtime.getRuntime().availableProcessors() / 2, 1));
-		final ExecutorService singleExcecutor = Executors.newSingleThreadExecutor();
+		this.downloadThreadpool = Executors.newFixedThreadPool(Math.max(Runtime.getRuntime().availableProcessors() / 2, 1));
+		this.singleExcecutor = Executors.newSingleThreadExecutor();
+		final List<CompletableFuture<Void>> futures = new ArrayList<>();
 
 		try(ZipFile zf = new ZipFile(modpackZip.toFile())) {
 			ZipEntry manifestEntry = zf.getEntry("manifest.json");
@@ -117,7 +119,7 @@ public class ClientSideHandler extends SideHandler {
 					int projectID = mod.getAsJsonPrimitive("projectID").getAsInt();
 					int fileID = mod.getAsJsonPrimitive("fileID").getAsInt();
 
-					downloadThreadpool.execute(() -> {
+					CompletableFuture<Void> future = CompletableFuture.supplyAsync(() -> {
 						ModMapping mapping = this.getMapping(projectID, fileID).orElseGet(() -> {
 							try {
 								LOGGER.debug("Downloading curse file {} for project {}", fileID, projectID);
@@ -130,16 +132,22 @@ public class ClientSideHandler extends SideHandler {
 							}
 						});
 
+						return mapping;
+					}, downloadThreadpool)
+					.thenAcceptAsync(mapping -> {
 						if(mapping != null) {
-							singleExcecutor.submit(() -> this.loadedModNames.add(mapping.getFileName()));
+							this.loadedModNames.add(mapping.getFileName());
 						}
-
-					});
+					}, singleExcecutor);
+					
+					futures.add(future);
+					
 				}else if("local".equals(source)) {
 					String filename = mod.getAsJsonPrimitive("file").getAsString();
 					ZipEntry modEntry = zf.getEntry("mods/" + filename);
 					Files.copy(zf.getInputStream(modEntry), getServermodsFolder().resolve(filename), StandardCopyOption.REPLACE_EXISTING);
-					singleExcecutor.submit(() -> this.loadedModNames.add(filename));
+					CompletableFuture<Void> future = CompletableFuture.runAsync(() -> this.loadedModNames.add(filename), singleExcecutor);
+					futures.add(future);
 				}
 			}
 
@@ -157,21 +165,13 @@ public class ClientSideHandler extends SideHandler {
 					LOGGER.debug("Skipped writing additional file {}, because it already exists", destination.toString());
 				}
 			}
+			
+			this.installTask = CompletableFuture.allOf(futures.toArray(new CompletableFuture[futures.size()]));
 
 		}catch(IOException e) {
 			LOGGER.catching(e);
 			this.status = "Exception while loading modpack";
-		}finally {
-			try {
-				downloadThreadpool.shutdown();
-				downloadThreadpool.awaitTermination(2, TimeUnit.HOURS);
-
-				singleExcecutor.shutdown();
-				singleExcecutor.awaitTermination(2, TimeUnit.HOURS);
-			}catch(InterruptedException e) {
-			}
 		}
-
 	}
 
 	public String getRemoteServer() {
