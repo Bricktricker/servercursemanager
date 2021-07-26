@@ -139,6 +139,9 @@ public abstract class SideHandler {
 	}
 	
 	public void waitForInstall() {
+		if(this.installTask == null) {
+			return;
+		}
 		try {
 			this.installTask.get();
 		}catch(InterruptedException | ExecutionException e) {
