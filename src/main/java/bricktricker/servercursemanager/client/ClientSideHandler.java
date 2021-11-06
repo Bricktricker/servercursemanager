@@ -22,18 +22,15 @@ import bricktricker.servercursemanager.SideHandler;
 import bricktricker.servercursemanager.Utils;
 import cpw.mods.forge.cursepacklocator.HashChecker;
 import cpw.mods.forge.serverpacklocator.LaunchEnvironmentHandler;
-import cpw.mods.forge.serverpacklocator.client.ClientCertificateManager;
 
 public class ClientSideHandler extends SideHandler {
 
-	private ClientCertificateManager certManager;
 	private SimpleHttpClient httpClient;
 
 	private String status = "";
 
 	public ClientSideHandler(Path gameDir) {
 		super(gameDir);
-		this.certManager = new ClientCertificateManager(this.packConfig, this.getServerpackFolder(), LaunchEnvironmentHandler.INSTANCE.getUUID());
 		this.status = "Not set up";
 	}
 
@@ -44,7 +41,7 @@ public class ClientSideHandler extends SideHandler {
 
 	@Override
 	public boolean isValid() {
-		return this.certManager.isValid();
+		return true;
 	}
 
 	@Override
@@ -57,13 +54,12 @@ public class ClientSideHandler extends SideHandler {
 			throw new IllegalStateException("Offline play not supported");
 		}
 
-		final String certificate = this.packConfig.get("client.certificate");
-		final String key = this.packConfig.get("client.key");
+		final String password = this.packConfig.get("client.password");
 		final String remoteServer = this.packConfig.get("client.remoteServer");
 
-		LOGGER.debug("Configuration: Certificate {}, Key {}, remoteServer {}", certificate, key, remoteServer);
+		LOGGER.debug("Configuration: password length {}, remoteServer {}", password.length(), remoteServer);
 
-		if(Utils.isBlank(certificate, key, remoteServer)) {
+		if(Utils.isBlank(password, remoteServer)) {
 			LOGGER.fatal("Invalid configuration for Server Curse Manager found: {}, please delete or correct before trying again", this.packConfig.getNioPath());
 			throw new IllegalStateException("Invalid Configuration");
 		}
@@ -76,10 +72,10 @@ public class ClientSideHandler extends SideHandler {
 		final Path modpackZip = this.getServerpackFolder().resolve("modpack.zip");
 		String currentModpackHash = "0";
 		if(Files.exists(modpackZip) && Files.isRegularFile(modpackZip)) {
-			currentModpackHash = String.valueOf(HashChecker.computeHash(modpackZip));
+			currentModpackHash = String.valueOf(HashChecker.computeMurmurHash(modpackZip));
 		}
 
-		this.httpClient = new SimpleHttpClient(this, currentModpackHash);
+		this.httpClient = new SimpleHttpClient(this, currentModpackHash, this.packConfig.get("client.password"));
 
 		boolean downloadSuccessful = false;
 		try {
@@ -182,16 +178,11 @@ public class ClientSideHandler extends SideHandler {
 	public void doCleanup() {
 		super.doCleanup();
 		this.httpClient = null;
-		this.certManager = null;
 	}
 
 	@Override
 	public String getStatus() {
 		return this.status;
-	}
-
-	public ClientCertificateManager getCertManager() {
-		return this.certManager;
 	}
 
 }

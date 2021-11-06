@@ -1,11 +1,7 @@
 package bricktricker.servercursemanager.server;
 
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
-
-import javax.net.ssl.SSLException;
-import sun.security.x509.X500Name;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -25,12 +21,10 @@ import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpUtil;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.QueryStringDecoder;
-import io.netty.handler.ssl.SslHandler;
-import io.netty.handler.ssl.SslHandshakeCompletionEvent;
 
 /**
- * Based on https://github.com/cpw/serverpacklocator/blob/e0e101c8db9008e7b9f9c8e0841fa92bf69ffcdb/src/main/java/cpw/mods/forge/serverpacklocator/server/RequestHandler.java
- * @author cpw
+ * Based on https://github.com/OrionDevelopment/serverpacklocator/blob/4ed6a61ec664f403a426e52e7862c36bea5c8f0f/src/main/java/cpw/mods/forge/serverpacklocator/server/RequestHandler.java
+ * @author cpw, OrionDevelopment
  */
 public class RequestHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
 
@@ -38,10 +32,12 @@ public class RequestHandler extends SimpleChannelInboundHandler<FullHttpRequest>
 
 	private final byte[] modpackData;
 	private final String modpackHash;
+	private final String passwordHash;
 
-	public RequestHandler(byte[] modpackData) {
+	public RequestHandler(final byte[] modpackData, final String password) {
 		this.modpackData = modpackData;
-		this.modpackHash = String.valueOf(HashChecker.computeHash(modpackData));
+		this.modpackHash = String.valueOf(HashChecker.computeMurmurHash(modpackData));
+		this.passwordHash = HashChecker.computeSHA256(password);
 	}
 
 	@Override
@@ -54,6 +50,18 @@ public class RequestHandler extends SimpleChannelInboundHandler<FullHttpRequest>
 	}
 
 	private void handleGet(final ChannelHandlerContext ctx, final FullHttpRequest msg) {
+		if (!msg.headers().contains("Authentication")) {
+            LOGGER.warn("Received unauthenticated request.");
+            sendErrorReply(ctx, HttpResponseStatus.FORBIDDEN, "No Authentication");
+            return;
+        }
+		var hash = msg.headers().get("Authentication");
+        if (!hash.equals(this.passwordHash)) {
+            LOGGER.warn("Received unauthorized request.");
+            sendErrorReply(ctx, HttpResponseStatus.FORBIDDEN, "No Authentication");
+            return;
+        }
+		
 		QueryStringDecoder decoder = new QueryStringDecoder(msg.uri());
 		if(Objects.equals("/modpack.zip", decoder.path())) {
 			LOGGER.info("Modpack request for client {}", ctx.channel().remoteAddress());
@@ -65,34 +73,6 @@ public class RequestHandler extends SimpleChannelInboundHandler<FullHttpRequest>
 		}else {
 			LOGGER.debug("Failed to understand message {}", msg);
 			sendErrorReply(ctx, HttpResponseStatus.NOT_FOUND, "Not Found");
-		}
-	}
-
-	@SuppressWarnings("deprecation") //X509Certificate got deprecated in Java 9
-	@Override
-	public void userEventTriggered(final ChannelHandlerContext ctx, final Object evt) throws Exception {
-		if(evt instanceof SslHandshakeCompletionEvent) {
-			if(((SslHandshakeCompletionEvent) evt).isSuccess()) {
-				SslHandler sslhandler = (SslHandler) ctx.channel().pipeline().get("ssl");
-				try {
-					X500Name name = (X500Name) sslhandler.engine().getSession().getPeerCertificateChain()[0].getSubjectDN();
-					LOGGER.debug("Connection from {} @ {}", name.getCommonName(), ctx.channel().remoteAddress());
-				}catch(IOException e) {
-					LOGGER.warn("Illegal state in connection", e);
-					ctx.close();
-				}
-			}else {
-				LOGGER.warn("Disconnected unauthenticated peer at {} : {}", ctx.channel().remoteAddress(), ((SslHandshakeCompletionEvent) evt).cause().getMessage());
-			}
-		}
-	}
-
-	@Override
-	public void exceptionCaught(final ChannelHandlerContext ctx, final Throwable cause) throws Exception {
-		if(!(cause.getCause() instanceof SSLException)) {
-			LOGGER.warn("Error in request handler code", cause);
-		}else {
-			LOGGER.trace("SSL error in handling code", cause.getCause());
 		}
 	}
 

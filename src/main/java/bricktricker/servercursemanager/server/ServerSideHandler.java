@@ -23,18 +23,13 @@ import bricktricker.servercursemanager.CopyOption;
 import bricktricker.servercursemanager.CurseDownloader;
 import bricktricker.servercursemanager.SideHandler;
 import bricktricker.servercursemanager.Utils;
-import cpw.mods.forge.serverpacklocator.server.ServerCertificateManager;
 import cpw.mods.forge.serverpacklocator.server.SimpleHttpServer;
 
 public class ServerSideHandler extends SideHandler {
 
-	private ServerCertificateManager certManager;
-	@SuppressWarnings("unused")
-	private SimpleHttpServer httpServer;
-
 	public ServerSideHandler(Path gameDir) {
 		super(gameDir);
-		this.certManager = new ServerCertificateManager(packConfig, packConfig.getNioPath().getParent());
+		//this.certManager = new ServerCertificateManager(packConfig, packConfig.getNioPath().getParent());
 	}
 
 	@Override
@@ -44,15 +39,13 @@ public class ServerSideHandler extends SideHandler {
 
 	@Override
 	protected void validateConfig() {
-		final String certificate = this.packConfig.get("server.cacertificate");
-		final String key = this.packConfig.get("server.cakey");
-		final String servername = this.packConfig.get("server.name");
+		final String password = this.packConfig.get("server.password");
 		final int port = this.packConfig.get("server.port");
 		final String packFile = this.packConfig.get("server.packfile");
 
-		LOGGER.debug("Configuration: Certificate {}, Key {}, servername {}, port {}, packFile {}", certificate, key, servername, port, packFile);
+		LOGGER.debug("Configuration: password length {}, port {}, packFile {}", password.length(), port, packFile);
 
-		if(Utils.isBlank(certificate, key, servername, packFile) || port <= 0) {
+		if(Utils.isBlank(password, packFile) || port <= 0) {
 			LOGGER.fatal("Invalid configuration for Server Curse Manager found: {}, please delete or correct before trying again", this.packConfig.getNioPath());
 			throw new IllegalStateException("Invalid Configuration");
 		}
@@ -267,13 +260,10 @@ public class ServerSideHandler extends SideHandler {
 			}
 	
 			byte[] packData = baos.toByteArray();
-			this.httpServer = new SimpleHttpServer(this, packData);
+			
+			SimpleHttpServer.run(this, packData, this.packConfig.get("server.password"));
 		
 		}, r -> r.run());
-	}
-
-	public ServerCertificateManager getCertificateManager() {
-		return this.certManager;
 	}
 
 	public int getPort() {

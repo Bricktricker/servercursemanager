@@ -121,7 +121,7 @@ public abstract class SideHandler {
 		// check hash
 		modMapping.filter(mapping -> {
 			Path modFile = this.serverModsPath.resolve(mapping.fileName);
-			long hash = HashChecker.computeHash(modFile);
+			long hash = HashChecker.computeMurmurHash(modFile);
 			return String.valueOf(hash).equals(mapping.hash);
 		});
 
@@ -185,6 +185,7 @@ public abstract class SideHandler {
 		return this.serverModsPath;
 	}
 
+	// TODO: replace with Record
 	protected static class ModMapping {
 		private final int projectID;
 		private final int fileID;

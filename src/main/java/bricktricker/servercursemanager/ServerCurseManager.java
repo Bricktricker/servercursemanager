@@ -11,9 +11,7 @@ import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.function.Consumer;
-import java.util.jar.Manifest;
 import java.util.stream.Collectors;
 
 import org.apache.logging.log4j.LogManager;
@@ -80,18 +78,8 @@ public class ServerCurseManager implements IModLocator {
 	}
 
 	@Override
-	public Path findPath(IModFile modFile, String... path) {
-		return dirLocator.findPath(modFile, path);
-	}
-
-	@Override
 	public void scanFile(IModFile modFile, Consumer<Path> pathConsumer) {
 		dirLocator.scanFile(modFile, pathConsumer);
-	}
-
-	@Override
-	public Optional<Manifest> findManifest(Path file) {
-		return dirLocator.findManifest(file);
 	}
 
 	@Override
@@ -108,7 +96,11 @@ public class ServerCurseManager implements IModLocator {
 		// https://github.com/cpw/serverpacklocator/blob/e0e101c8db9008e7b9f9c8e0841fa92bf69ffcdb/src/main/java/cpw/mods/forge/serverpacklocator/PackLocator.java#L80-L84
 		Path serverModsPath = sideHandler.getServermodsFolder();
 		URL url = getClass().getProtectionDomain().getCodeSource().getLocation();
-		URI targetURI = LamdbaExceptionUtils.uncheck(() -> new URI("file://" + LamdbaExceptionUtils.uncheck(url::toURI).getRawSchemeSpecificPart().split("!")[0]));
+		
+		LOGGER.info("Loading server pack locator from: " + url.toString());
+        URI targetURI = LamdbaExceptionUtils.uncheck(() -> new URI("file://" + LamdbaExceptionUtils.uncheck(url::toURI).getRawSchemeSpecificPart().split("!")[0].split("\\.jar")[0] + ".jar"));
+
+        LOGGER.info("Unpacking utility mod from: " + targetURI.toString());
 		final FileSystem thiszip = LamdbaExceptionUtils.uncheck(() -> FileSystems.newFileSystem(Paths.get(targetURI), getClass().getClassLoader()));
 		final Path utilModPath = thiszip.getPath("utilmod", "serverpackutility.jar");
 		LamdbaExceptionUtils.uncheck(() -> Files.copy(utilModPath, serverModsPath.resolve("serverpackutility.jar"), StandardCopyOption.REPLACE_EXISTING));

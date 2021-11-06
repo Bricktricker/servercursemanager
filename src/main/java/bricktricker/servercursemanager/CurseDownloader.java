@@ -31,7 +31,7 @@ public class CurseDownloader {
 		url = new URL(downloadURL);
 		Files.copy(url.openStream(), target, StandardCopyOption.REPLACE_EXISTING);
 
-		String modHash = String.valueOf(HashChecker.computeHash(target));
+		String modHash = String.valueOf(HashChecker.computeMurmurHash(target));
 		String expectedHash = String.valueOf(metaData.getAsJsonPrimitive("packageFingerprint").getAsLong());
 
 		if(!modHash.equals(expectedHash)) {

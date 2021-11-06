@@ -3,8 +3,12 @@ package cpw.mods.forge.cursepacklocator;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Locale;
 
 /**
  * Copied from https://github.com/cpw/cursepacklocator/blob/af022a248bb24ebca3d971b515f2380dc709822c/src/main/java/cpw/mods/forge/cursepacklocator/HashChecker.java
@@ -26,7 +30,7 @@ public class HashChecker {
         return bos.toByteArray();
     }
 
-    public static long computeHash(final Path file) {
+    public static long computeMurmurHash(final Path file) {
         try {
             final byte[] bytes = Files.readAllBytes(file);
             final byte[] normalizedArray = computeNormalizedArray(bytes);
@@ -37,9 +41,24 @@ public class HashChecker {
         }
     }
     
-    public static long computeHash(final byte[] bytes) {
+    public static long computeMurmurHash(final byte[] bytes) {
     	final byte[] normalizedArray = computeNormalizedArray(bytes);
         int res = Murmur2.hash32(normalizedArray, normalizedArray.length, 1);
         return Integer.toUnsignedLong(res);
+    }
+    
+    public static String computeSHA256(final String s) {
+    	try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            md.update(s.getBytes(StandardCharsets.UTF_8));
+            byte[] digest = md.digest();
+            StringBuilder sb = new StringBuilder();
+            for (byte b : digest) {
+                sb.append(Integer.toHexString(b & 0xff));
+            }
+            return sb.toString().toUpperCase(Locale.ROOT);
+        }catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("Missing SHA-256 hashing algorithm", e);
+        }
     }
 }

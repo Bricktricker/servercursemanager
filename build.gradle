@@ -6,28 +6,29 @@ plugins {
 
 group 'bricktricker'
 project.version = '1.0.1'
-ext.forge_version = '36.1.23'
-ext.mc_version = '1.16.5'
+ext.forge_version = '37.0.104'
+ext.mc_version = '1.17.1'
 
-targetCompatibility = sourceCompatibility = compileJava.sourceCompatibility = compileJava.targetCompatibility = JavaVersion.VERSION_1_8
+java.toolchain.languageVersion = JavaLanguageVersion.of(16)
 
 repositories {
     mavenLocal()
     mavenCentral()
     maven {
         name = 'forge'
-        url = 'https://files.minecraftforge.net/maven'
+        url = 'https://maven.minecraftforge.net'
     }
 }
 
 ext.sharedManifest = manifest {
     attributes(['Class-Path': 'forge.jar',
      'Main-Class': 'net.minecraftforge.server.ServerMain',
-     'ServerLaunchArgs': "--gameDir . --launchTarget fmlserver --fml.forgeVersion ${forge_version} --fml.mcpVersion 20190829.143755 --fml.mcVersion ${mc_version} --fml.forgeGroup net.minecraftforge"
+     'ServerLaunchArgs': "--gameDir . --launchTarget fmlserver --fml.forgeVersion ${forge_version} --fml.mcpVersion 20210706.113038 --fml.mcVersion ${mc_version} --fml.forgeGroup net.minecraftforge"
     ],
     )
     attributes(
             ['Specification-Title'     : 'servercursemanager',
+             'Automatic-Module-Name' : 'serverpacklocator',
              'Specification-Vendor'    : 'bricktricker',
              'Specification-Version'   : '1',
              'Implementation-Title'    : project.name,
@@ -50,10 +51,9 @@ task sourcesJar(type: Jar) {
     from sourceSets.main.allSource
 }
 
-
 dependencies {
-    implementation('cpw.mods:modlauncher:8.0.+')
-    implementation('net.minecraftforge:forgespi:3.2.+')
+    implementation('cpw.mods:modlauncher:9.0.+')
+    implementation('net.minecraftforge:forgespi:4.0.+')
     implementation('com.electronwill.night-config:core:3.6.3')
     implementation('com.electronwill.night-config:toml:3.6.3')
     implementation('com.google.code.gson:gson:2.8.0')
@@ -84,8 +84,3 @@ artifacts {
     archives sourcesJar
 }
 
-compileJava {
-    options.compilerArgs << '-XDignore.symbol.file'
-    options.fork = true
-    options.forkOptions.executable = 'javac'
-}
