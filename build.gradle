@@ -5,7 +5,7 @@ plugins {
 }
 
 group 'bricktricker'
-project.version = '1.0.1'
+project.version = '1.1.0'
 ext.forge_version = '37.0.104'
 ext.mc_version = '1.17.1'
 
