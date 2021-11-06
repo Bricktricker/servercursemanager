@@ -1,6 +1,5 @@
 package cpw.mods.forge.serverpacklocator;
 
-import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 
 /**
@@ -12,11 +11,8 @@ import java.util.function.Supplier;
  */
 public class ModAccessor {
     public static String statusLine = "ServerPack: unknown";
-    public static boolean needsCertificate = true;
 
     public static Supplier<String> status() {
         return ()->statusLine;
     }
-
-    public static BooleanSupplier needsCert() { return () -> needsCertificate; }
 }
