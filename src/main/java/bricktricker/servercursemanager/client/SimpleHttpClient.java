@@ -36,14 +36,14 @@ public class SimpleHttpClient {
     }
 
     private boolean connectAndDownload(String server) {
-    	if(server.endsWith("/")) {
-    		server.substring(0, server.length() - 1);	
+    	if(!server.endsWith("/")) {
+    		server = server + "/";
     	}
         LaunchEnvironmentHandler.INSTANCE.addProgressMessage("Connecting to server at " + server);
         
         URL url;
 		try {
-			url = new URL(server + "/modpack.zip?hash=" + currentModpackHash);
+			url = new URL(server + "modpack.zip?hash=" + currentModpackHash);
 		}catch(MalformedURLException e) {
 			throw new UncheckedIOException(e);
 		}
@@ -53,21 +53,29 @@ public class SimpleHttpClient {
 			connection.setRequestProperty("Authentication", this.passwordHash);
         
 	        try (BufferedInputStream in = new BufferedInputStream(connection.getInputStream())) {
-	        	LaunchEnvironmentHandler.INSTANCE.addProgressMessage("Receiving modpack.zip");
-	        	final Path modpack = clientSideHandler.getServerpackFolder().resolve("modpack.zip");
-	        	try (OutputStream os = Files.newOutputStream(modpack)) {
-	                in.transferTo(os);
-	                downloadSuccessful = true;
-	            } catch (IOException e) {
-	                LOGGER.catching(e);
-	            }
+	        	int code = ((HttpURLConnection)connection).getResponseCode();
+	        	if(code == 200) {
+		        	LaunchEnvironmentHandler.INSTANCE.addProgressMessage("Receiving modpack.zip");
+		        	final Path modpack = clientSideHandler.getServerpackFolder().resolve("modpack.zip");
+		        	try (OutputStream os = Files.newOutputStream(modpack)) {
+		                in.transferTo(os);
+		                downloadSuccessful = true;
+		            } catch (IOException e) {
+		                LOGGER.catching(e);
+		            }	
+	        	}else if(code == 304){
+	        		LaunchEnvironmentHandler.INSTANCE.addProgressMessage("Using old modpack.zip");
+	        		downloadSuccessful = true;
+	        	}else {
+	        		LOGGER.error("Could not fetch modpack.zip, got status code {}", code);
+	        	}
 	        }
         } catch (IOException e) {
             throw new IllegalStateException("Failed to download manifest", e);
         }
         
         if (!downloadSuccessful) {
-            LaunchEnvironmentHandler.INSTANCE.addProgressMessage("Failed to complete transaction at " + server);
+            LaunchEnvironmentHandler.INSTANCE.addProgressMessage("Failed to complete download at " + server);
             LOGGER.error("Failed to receive successful data connection from server.");
             return false;
         }

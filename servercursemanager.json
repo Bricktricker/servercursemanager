@@ -3,7 +3,7 @@
   "time": "2019-09-01T18:46:04+00:00",
   "releaseTime": "2019-10-18T00:00:00+00:00",
   "type": "release",
-  "mainClass": "cpw.mods.modlauncher.Launcher",
+  "mainClass": "cpw.mods.bootstraplauncher.BootstrapLauncher",
   "inheritsFrom": "@mcversion@-forge-@forgeversion@",
   "logging": {
 
