@@ -132,7 +132,7 @@ public class ClientSideHandler extends SideHandler {
 					}, downloadThreadpool)
 					.thenAcceptAsync(mapping -> {
 						if(mapping != null) {
-							this.loadedModNames.add(mapping.getFileName());
+							this.loadedModNames.add(mapping.fileName());
 						}
 					}, singleExcecutor);
 					

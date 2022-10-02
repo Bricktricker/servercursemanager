@@ -184,62 +184,7 @@ public abstract class SideHandler {
 	public Path getServermodsFolder() {
 		return this.serverModsPath;
 	}
-
-	// TODO: replace with Record
-	protected static class ModMapping {
-		private final int projectID;
-		private final int fileID;
-		private final String fileName;
-		private final String hash;
-
-		public ModMapping(int projectID, int fileID, String fileName, String hash) {
-			this.projectID = projectID;
-			this.fileID = fileID;
-			this.fileName = fileName;
-			this.hash = hash;
-		}
-
-		public int getProjectID() {
-			return projectID;
-		}
-
-		public int getFileID() {
-			return fileID;
-		}
-
-		public String getFileName() {
-			return fileName;
-		}
-
-		public String getHash() {
-			return hash;
-		}
-
-		@Override
-		public int hashCode() {
-			final int prime = 31;
-			int result = 1;
-			result = prime * result + fileID;
-			result = prime * result + projectID;
-			return result;
-		}
-
-		@Override
-		public boolean equals(Object obj) {
-			if(this == obj)
-				return true;
-			if(obj == null)
-				return false;
-			if(getClass() != obj.getClass())
-				return false;
-			ModMapping other = (ModMapping) obj;
-			if(fileID != other.fileID)
-				return false;
-			if(projectID != other.projectID)
-				return false;
-			return true;
-		}
-
-	}
+	
+	protected static record ModMapping(int projectID, int fileID, String fileName, String hash) {}
 
 }

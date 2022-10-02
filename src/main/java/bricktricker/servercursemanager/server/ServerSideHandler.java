@@ -109,7 +109,7 @@ public class ServerSideHandler extends SideHandler {
 				.thenAcceptAsync(mapping -> {
 					if(mapping != null) {
 						manifestMods.add(mod);
-						this.loadedModNames.add(mapping.getFileName());	
+						this.loadedModNames.add(mapping.fileName());	
 					}
 				}, singleExcecutor);
 				

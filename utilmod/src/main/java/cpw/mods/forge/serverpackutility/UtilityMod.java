@@ -17,7 +17,7 @@ import java.util.Optional;
 import java.util.function.Supplier;
 
 import net.minecraft.client.gui.screens.TitleScreen;
-import net.minecraftforge.client.event.GuiScreenEvent.DrawScreenEvent.Pre;
+import net.minecraftforge.client.event.ScreenEvent.Render.Pre;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
@@ -45,7 +45,7 @@ public class UtilityMod {
 
         static void onShowGui(Pre event) {
             if (!brandingHacked) {
-                if (event.getGui() instanceof TitleScreen) {
+                if (event.getScreen() instanceof TitleScreen) {
                     List<String> branding = (List<String>) LamdbaExceptionUtils.uncheck(() -> (List)brandingList.get(null));
                     if (branding != null) {
                         Builder<String> brd = ImmutableList.builder();

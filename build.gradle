@@ -7,9 +7,9 @@ plugins {
 group 'bricktricker'
 project.version = '1.1.0'
 ext.forge_version = '37.0.104'
-ext.mc_version = '1.17.1'
+ext.mc_version = '1.19.1'
 
-java.toolchain.languageVersion = JavaLanguageVersion.of(16)
+java.toolchain.languageVersion = JavaLanguageVersion.of(17)
 
 repositories {
     mavenLocal()
@@ -52,14 +52,20 @@ task sourcesJar(type: Jar) {
 }
 
 dependencies {
-    implementation('cpw.mods:modlauncher:9.0.+')
-    implementation('net.minecraftforge:forgespi:4.0.+')
-    implementation('com.electronwill.night-config:core:3.6.3')
-    implementation('com.electronwill.night-config:toml:3.6.3')
-    implementation('com.google.code.gson:gson:2.8.0')
-    implementation('io.netty:netty-all:4.1.25.Final')
-    implementation('org.apache.logging.log4j:log4j-api:2.11.2')
-    implementation('org.apache.commons:commons-lang3:3.8.1')
+    implementation('cpw.mods:modlauncher:10.0.8')
+    implementation('net.minecraftforge:forgespi:6.0.2')
+    implementation('com.electronwill.night-config:core:3.6.4')
+    implementation('com.electronwill.night-config:toml:3.6.4')
+    implementation('com.google.code.gson:gson:2.8.9')
+    
+    implementation('io.netty:netty-common:4.1.77.Final')
+    implementation('io.netty:netty-buffer:4.1.77.Final')
+    implementation('io.netty:netty-handler:4.1.77.Final')
+    implementation('io.netty:netty-codec:4.1.77.Final')
+    implementation('io.netty:netty-codec-http:4.1.77.Final') // Needs shadowing, rest is included in Minecraft
+    
+    implementation('org.apache.logging.log4j:log4j-api:2.17.0')
+    implementation('org.apache.commons:commons-lang3:3.12.0')
 }
 
 task zip(type: Zip, dependsOn: jar) {
