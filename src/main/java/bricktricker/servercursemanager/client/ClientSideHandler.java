@@ -56,12 +56,11 @@ public class ClientSideHandler extends SideHandler {
 			throw new IllegalStateException("Offline play not supported");
 		}
 
-		final String password = this.packConfig.get("client.password");
 		final String remoteServer = this.packConfig.get("client.remoteServer");
 
-		LOGGER.debug("Configuration: password length {}, remoteServer {}", password.length(), remoteServer);
+		LOGGER.debug("Configuration: remoteServer {}", remoteServer);
 
-		if(Utils.isBlank(password, remoteServer)) {
+		if(remoteServer.isBlank()) {
 			LOGGER.fatal("Invalid configuration for Server Curse Manager found: {}, please delete or correct before trying again", this.packConfig.getNioPath());
 			throw new IllegalStateException("Invalid Configuration");
 		}

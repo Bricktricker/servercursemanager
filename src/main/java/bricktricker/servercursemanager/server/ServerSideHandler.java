@@ -28,6 +28,7 @@ import bricktricker.servercursemanager.CopyOption;
 import bricktricker.servercursemanager.CurseDownloader;
 import bricktricker.servercursemanager.SideHandler;
 import bricktricker.servercursemanager.Utils;
+import cpw.mods.forge.serverpacklocator.secure.ProfileKeyPairBasedSecurityManager;
 import cpw.mods.forge.serverpacklocator.server.SimpleHttpServer;
 
 public class ServerSideHandler extends SideHandler {
@@ -45,13 +46,12 @@ public class ServerSideHandler extends SideHandler {
 
 	@Override
 	protected void validateConfig() {
-		final String password = this.packConfig.get("server.password");
 		final int port = this.packConfig.get("server.port");
 		final String packFile = this.packConfig.get("server.packfile");
 
-		LOGGER.debug("Configuration: password length {}, port {}, packFile {}", password.length(), port, packFile);
+		LOGGER.debug("Configuration: port {}, packFile {}", port, packFile);
 
-		if(Utils.isBlank(password, packFile) || port <= 0) {
+		if(packFile.isBlank() || port <= 0) {
 			LOGGER.fatal("Invalid configuration for Server Curse Manager found: {}, please delete or correct before trying again", this.packConfig.getNioPath());
 			throw new IllegalStateException("Invalid Configuration");
 		}
@@ -352,9 +352,12 @@ public class ServerSideHandler extends SideHandler {
 	
 			byte[] packData = baos.toByteArray();
 			
-			SimpleHttpServer.run(this, packData, this.packConfig.get("server.password"));
+			SimpleHttpServer.run(this, packData);
 		
 		}, r -> r.run());
+		
+		// Initialize ProfileKeyPairBasedSecurityManager
+		ProfileKeyPairBasedSecurityManager.getInstance();
 	}
 
 	public int getPort() {

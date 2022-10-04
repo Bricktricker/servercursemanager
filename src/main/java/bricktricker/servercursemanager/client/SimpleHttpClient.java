@@ -1,16 +1,21 @@
 package bricktricker.servercursemanager.client;
 
 import cpw.mods.forge.serverpacklocator.LaunchEnvironmentHandler;
+import cpw.mods.forge.serverpacklocator.secure.ProfileKeyPairBasedSecurityManager;
+
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.BufferedInputStream;
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.UncheckedIOException;
 import java.net.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Base64;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -25,6 +30,8 @@ public class SimpleHttpClient {
     private final Future<Boolean> downloadJob;
     private boolean downloadSuccessful = false;
     private final String currentModpackHash;
+    
+    private byte[] challenge;
 
     public SimpleHttpClient(final ClientSideHandler clientSideHandler, String currentModpackHash) {
     	this.currentModpackHash = currentModpackHash;
@@ -38,6 +45,12 @@ public class SimpleHttpClient {
     	}
         LaunchEnvironmentHandler.INSTANCE.addProgressMessage("Connecting to server at " + server);
         
+        try {
+			downloadChallenge(server);
+		}catch(IOException e) {
+			throw new UncheckedIOException(e);
+		}
+        
         URL url;
 		try {
 			url = new URL(server + "modpack.zip?hash=" + currentModpackHash);
@@ -47,7 +60,7 @@ public class SimpleHttpClient {
 		
 		try {
 			var connection = url.openConnection();
-			//connection.setRequestProperty("Authentication", this.passwordHash);
+			ProfileKeyPairBasedSecurityManager.getInstance().onClientConnectionCreation(connection, this.challenge);
         
 	        try (BufferedInputStream in = new BufferedInputStream(connection.getInputStream())) {
 	        	int code = ((HttpURLConnection)connection).getResponseCode();
@@ -87,5 +100,24 @@ public class SimpleHttpClient {
         } catch (InterruptedException e) {
             return false;
         }
+    }
+    
+    protected void downloadChallenge(final String serverHost) throws IOException {
+    	var address = serverHost + "challenge";
+
+    	LOGGER.info("Requesting challenge from: " + serverHost);
+    	LaunchEnvironmentHandler.INSTANCE.addProgressMessage("Requesting Challenge from: " + serverHost);
+
+    	var url = new URL(address);
+        var connection = url.openConnection();
+
+        try (BufferedReader in = new BufferedReader(new InputStreamReader(connection.getInputStream()))) {
+        	final String challengeStr = in.readLine();
+        	LOGGER.info("Got Challenge {}", challengeStr);
+        	challenge = Base64.getDecoder().decode(challengeStr);
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to download challenge", e);
+        }
+        LOGGER.debug("Received challenge");
     }
 }

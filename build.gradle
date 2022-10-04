@@ -81,6 +81,7 @@ dependencies {
     implementation('com.electronwill.night-config:core:3.6.4')
     implementation('com.electronwill.night-config:toml:3.6.4')
     implementation('com.google.code.gson:gson:2.8.9')
+    implementation("com.mojang:authlib:3.11.49")
     
     shadow("io.netty:netty-all:4.1.25.Final")
     //We only need to shadow the 'netty-codec-http' jar, the rest is included in Minecraft, but not sure how to do it

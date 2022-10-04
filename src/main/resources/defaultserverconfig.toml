@@ -3,5 +3,4 @@
 port = 8080
 # The file in the 'serverpack' folder that specifies the loaded mods
 packfile = "pack.json"
-# The server password: Change this to something else
-password = "!!CHANGEME!!"
+

@@ -123,14 +123,4 @@ public class Utils {
 			orElse.run();
 		}
 	}
-
-	public static boolean isBlank(String... strings) {
-		for(String s : strings) {
-			if(s == null || s.trim().isEmpty()) {
-				return true;
-			}
-		}
-		return false;
-	}
-
 }

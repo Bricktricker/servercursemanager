@@ -26,7 +26,7 @@ public class SimpleHttpServer {
     
     private SimpleHttpServer() {}
 
-    public static void run(ServerSideHandler handler, byte[] modpackData, String password) {
+    public static void run(ServerSideHandler handler, byte[] modpackData) {
     	EventLoopGroup masterGroup = new NioEventLoopGroup(1, (Runnable r) -> newDaemonThread("ServerCurseManager Master - ", r));
     	EventLoopGroup slaveGroup = new NioEventLoopGroup(1, (Runnable r) -> newDaemonThread("ServerCurseManager Slave - ", r));
 

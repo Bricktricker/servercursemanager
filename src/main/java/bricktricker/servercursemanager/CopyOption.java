@@ -30,7 +30,7 @@ public enum CopyOption {
 	}
 
 	public static CopyOption getOption(String copyOption) {
-		if(Utils.isBlank(copyOption)) {
+		if(copyOption.isBlank()) {
 			throw new IllegalArgumentException("copy name is empty");
 		}
 
