@@ -102,7 +102,7 @@ public class ServerCurseManager implements IModLocator {
 
         LOGGER.info("Unpacking utility mod from: " + targetURI.toString());
 		final FileSystem thiszip = LamdbaExceptionUtils.uncheck(() -> FileSystems.newFileSystem(Paths.get(targetURI), getClass().getClassLoader()));
-		final Path utilModPath = thiszip.getPath("utilmod", "serverpackutility.jar");
+		final Path utilModPath = thiszip.getPath("utilmod", "serverpackutility.zip");
 		LamdbaExceptionUtils.uncheck(() -> Files.copy(utilModPath, serverModsPath.resolve("serverpackutility.jar"), StandardCopyOption.REPLACE_EXISTING));
 	}
 

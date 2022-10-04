@@ -9,6 +9,9 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
@@ -20,7 +23,6 @@ import bricktricker.servercursemanager.CopyOption;
 import bricktricker.servercursemanager.CurseDownloader;
 import bricktricker.servercursemanager.SideHandler;
 import bricktricker.servercursemanager.Utils;
-import cpw.mods.forge.cursepacklocator.HashChecker;
 import cpw.mods.forge.serverpacklocator.LaunchEnvironmentHandler;
 
 public class ClientSideHandler extends SideHandler {
@@ -72,10 +74,10 @@ public class ClientSideHandler extends SideHandler {
 		final Path modpackZip = this.getServerpackFolder().resolve("modpack.zip");
 		String currentModpackHash = "0";
 		if(Files.exists(modpackZip) && Files.isRegularFile(modpackZip)) {
-			currentModpackHash = String.valueOf(HashChecker.computeMurmurHash(modpackZip));
+			currentModpackHash = Utils.computeSha1(modpackZip);
 		}
 
-		this.httpClient = new SimpleHttpClient(this, currentModpackHash, this.packConfig.get("client.password"));
+		this.httpClient = new SimpleHttpClient(this, currentModpackHash);
 
 		boolean downloadSuccessful = false;
 		try {
@@ -99,7 +101,8 @@ public class ClientSideHandler extends SideHandler {
 			return;
 		}
 
-		this.downloadThreadpool = Executors.newFixedThreadPool(Math.max(Runtime.getRuntime().availableProcessors() / 2, 1));
+		int numDownloadThreads = Math.max(Runtime.getRuntime().availableProcessors() / 2, 1);
+		this.downloadThreadpool = new ThreadPoolExecutor(1, numDownloadThreads, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<Runnable>());
 		this.singleExcecutor = Executors.newSingleThreadExecutor();
 		final List<CompletableFuture<Void>> futures = new ArrayList<>();
 
@@ -111,31 +114,26 @@ public class ClientSideHandler extends SideHandler {
 			for(JsonElement modE : mods) {
 				JsonObject mod = modE.getAsJsonObject();
 				final String source = mod.getAsJsonPrimitive("source").getAsString();
-				if("curse".equals(source)) {
-					int projectID = mod.getAsJsonPrimitive("projectID").getAsInt();
-					int fileID = mod.getAsJsonPrimitive("fileID").getAsInt();
-
+				if("remote".equals(source)) {
+					String url = mod.getAsJsonPrimitive("url").getAsString();
+					String sha1 = mod.getAsJsonPrimitive("sha1").getAsString();
+					String fileName = mod.getAsJsonPrimitive("file").getAsString();
+					
 					CompletableFuture<Void> future = CompletableFuture.supplyAsync(() -> {
-						ModMapping mapping = this.getMapping(projectID, fileID).orElseGet(() -> {
-							try {
-								LOGGER.debug("Downloading curse file {} for project {}", fileID, projectID);
-								ModMapping m = CurseDownloader.downloadMod(projectID, fileID, getServermodsFolder());
-								this.addMapping(m);
-								return m;
-							}catch(IOException e) {
-								LOGGER.catching(e);
-								return null;
-							}
-						});
-
-						return mapping;
+						try {
+							CurseDownloader.downloadFile(url, fileName, sha1, getServermodsFolder());
+							return fileName;
+						}catch(IOException e) {
+							LOGGER.catching(e);
+							return null;
+						}
 					}, downloadThreadpool)
-					.thenAcceptAsync(mapping -> {
-						if(mapping != null) {
-							this.loadedModNames.add(mapping.fileName());
+					.thenAcceptAsync(f -> {
+						if(f != null) {
+							this.loadedModNames.add(f);
 						}
 					}, singleExcecutor);
-					
+
 					futures.add(future);
 					
 				}else if("local".equals(source)) {

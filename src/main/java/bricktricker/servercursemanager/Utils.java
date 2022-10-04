@@ -9,6 +9,9 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Base64;
 import java.util.Optional;
 import java.util.TimeZone;
 import java.util.function.Consumer;
@@ -41,7 +44,7 @@ public class Utils {
 
 	public static JsonElement loadJson(Path file) {
 		try(Reader r = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
-			return new JsonParser().parse(r);
+			return JsonParser.parseReader(r);
 		}catch(IOException e) {
 			throw new UncheckedIOException(e);
 		}
@@ -49,7 +52,7 @@ public class Utils {
 
 	public static JsonElement loadJson(InputStream is) {
 		try(Reader r = new InputStreamReader(is, StandardCharsets.UTF_8)) {
-			return new JsonParser().parse(r);
+			return JsonParser.parseReader(r);
 		}catch(IOException e) {
 			throw new UncheckedIOException(e);
 		}
@@ -68,6 +71,33 @@ public class Utils {
 		String jsonStr = json.toString();
 		try {
 			os.write(jsonStr.getBytes(StandardCharsets.UTF_8));
+		}catch(IOException e) {
+			throw new UncheckedIOException(e);
+		}
+	}
+	
+	public static String computeSha1(InputStream is) {
+		try {
+			MessageDigest digest = MessageDigest.getInstance("SHA-1");
+			
+			byte[] buffer = new byte[4096];
+			int len = is.read(buffer);
+			while (len != -1) {
+				digest.update(buffer, 0, len);
+	            len = is.read(buffer);
+	        }
+			
+			return Base64.getEncoder().encodeToString(digest.digest());	
+		}catch(NoSuchAlgorithmException e) {
+			throw new RuntimeException(e);
+		}catch(IOException e) {
+			throw new UncheckedIOException(e);
+		}
+	}
+	
+	public static String computeSha1(Path file) {
+		try(var is = Files.newInputStream(file)){
+			return computeSha1(is);
 		}catch(IOException e) {
 			throw new UncheckedIOException(e);
 		}

@@ -1,6 +1,5 @@
 package bricktricker.servercursemanager.client;
 
-import cpw.mods.forge.cursepacklocator.HashChecker;
 import cpw.mods.forge.serverpacklocator.LaunchEnvironmentHandler;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -22,14 +21,12 @@ import java.util.concurrent.Future;
  */
 public class SimpleHttpClient {
     private static final Logger LOGGER = LogManager.getLogger();
-    private final String passwordHash;
     private final ClientSideHandler clientSideHandler;
     private final Future<Boolean> downloadJob;
     private boolean downloadSuccessful = false;
     private final String currentModpackHash;
 
-    public SimpleHttpClient(final ClientSideHandler clientSideHandler, String currentModpackHash, String password) {
-    	this.passwordHash = HashChecker.computeSHA256(password);
+    public SimpleHttpClient(final ClientSideHandler clientSideHandler, String currentModpackHash) {
     	this.currentModpackHash = currentModpackHash;
     	this.clientSideHandler = clientSideHandler;
         downloadJob = Executors.newSingleThreadExecutor().submit(() -> this.connectAndDownload(clientSideHandler.getRemoteServer()));
@@ -50,7 +47,7 @@ public class SimpleHttpClient {
 		
 		try {
 			var connection = url.openConnection();
-			connection.setRequestProperty("Authentication", this.passwordHash);
+			//connection.setRequestProperty("Authentication", this.passwordHash);
         
 	        try (BufferedInputStream in = new BufferedInputStream(connection.getInputStream())) {
 	        	int code = ((HttpURLConnection)connection).getResponseCode();

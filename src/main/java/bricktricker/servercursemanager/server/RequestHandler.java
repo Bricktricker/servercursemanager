@@ -1,12 +1,13 @@
 package bricktricker.servercursemanager.server;
 
+import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import cpw.mods.forge.cursepacklocator.HashChecker;
+import bricktricker.servercursemanager.Utils;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelFutureListener;
@@ -32,12 +33,10 @@ public class RequestHandler extends SimpleChannelInboundHandler<FullHttpRequest>
 
 	private final byte[] modpackData;
 	private final String modpackHash;
-	private final String passwordHash;
 
-	public RequestHandler(final byte[] modpackData, final String password) {
+	public RequestHandler(final byte[] modpackData) {
 		this.modpackData = modpackData;
-		this.modpackHash = String.valueOf(HashChecker.computeMurmurHash(modpackData));
-		this.passwordHash = HashChecker.computeSHA256(password);
+		this.modpackHash = Utils.computeSha1(new ByteArrayInputStream(modpackData));
 	}
 
 	@Override
@@ -50,17 +49,21 @@ public class RequestHandler extends SimpleChannelInboundHandler<FullHttpRequest>
 	}
 
 	private void handleGet(final ChannelHandlerContext ctx, final FullHttpRequest msg) {
+		/*
 		if (!msg.headers().contains("Authentication")) {
             LOGGER.warn("Received unauthenticated request.");
             sendErrorReply(ctx, HttpResponseStatus.FORBIDDEN, "No Authentication");
             return;
         }
+		
+		Replace password auth with something better
 		var hash = msg.headers().get("Authentication");
         if (!hash.equals(this.passwordHash)) {
             LOGGER.warn("Received unauthorized request.");
             sendErrorReply(ctx, HttpResponseStatus.FORBIDDEN, "No Authentication");
             return;
         }
+        */
 		
 		QueryStringDecoder decoder = new QueryStringDecoder(msg.uri());
 		if(Objects.equals("/modpack.zip", decoder.path())) {

@@ -50,7 +50,7 @@ public class SimpleHttpServer {
                     protected void initChannel(final SocketChannel ch) {
                         ch.pipeline().addLast("codec", new HttpServerCodec());
                         ch.pipeline().addLast("aggregator", new HttpObjectAggregator(2 << 19));
-                        ch.pipeline().addLast("request", new RequestHandler(modpackData, password));
+                        ch.pipeline().addLast("request", new RequestHandler(modpackData));
                     }
                 })
                 .option(ChannelOption.SO_BACKLOG, 128)

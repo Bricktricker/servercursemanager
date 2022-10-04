@@ -8,8 +8,13 @@ import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.StreamSupport;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -26,10 +31,11 @@ import bricktricker.servercursemanager.Utils;
 import cpw.mods.forge.serverpacklocator.server.SimpleHttpServer;
 
 public class ServerSideHandler extends SideHandler {
+	
+	private List<ModMapping> modMappings;
 
 	public ServerSideHandler(Path gameDir) {
 		super(gameDir);
-		//this.certManager = new ServerCertificateManager(packConfig, packConfig.getNioPath().getParent());
 	}
 
 	@Override
@@ -58,10 +64,88 @@ public class ServerSideHandler extends SideHandler {
 	public boolean isValid() {
 		return Files.exists(this.getServerpackFolder().resolve(this.packConfig.<String>get("server.packfile")));
 	}
+	
+	protected void loadMappings() {
+		this.modMappings = new ArrayList<>();
+		Path modMappingsFile = this.serverpackFolder.resolve("files.json");
+		if(!Files.exists(modMappingsFile)) {
+			return;
+		}
+
+		JsonArray mappingArray = Utils.loadJson(modMappingsFile).getAsJsonArray();
+		StreamSupport.stream(mappingArray.spliterator(), false)
+			.map(JsonElement::getAsJsonObject)
+			.map(mod -> {
+				int projectID = mod.getAsJsonPrimitive("projectID").getAsInt();
+				int fileID = mod.getAsJsonPrimitive("fileID").getAsInt();
+				String fileName = mod.getAsJsonPrimitive("fileName").getAsString();
+				String downloadUrl = mod.getAsJsonPrimitive("url").getAsString();
+				String sha1 = mod.getAsJsonPrimitive("sha1").getAsString();
+				
+				return new ModMapping(projectID, fileID, fileName, downloadUrl, sha1);
+		}).forEach(modMappings::add);
+	}
+
+	private void addMapping(ModMapping mapping) {
+		synchronized(this.modMappings) {
+			this.modMappings.removeIf(mod -> mod.projectID == mapping.projectID && mod.fileID == mapping.fileID);
+			this.modMappings.add(mapping);
+		}
+	}
+
+	private void saveAndCloseMappings() {
+		if(this.modMappings == null) {
+			return;
+		}
+
+		JsonArray mappingArray = new JsonArray();
+		for(ModMapping mapping : this.modMappings) {
+			JsonObject mod = new JsonObject();
+
+			mod.addProperty("projectID", mapping.projectID);
+			mod.addProperty("fileID", mapping.fileID);
+			mod.addProperty("fileName", mapping.fileName);
+			mod.addProperty("url", mapping.downloadUrl);
+			mod.addProperty("sha1", mapping.sha1);
+
+			mappingArray.add(mod);
+		}
+
+		Utils.saveJson(mappingArray, this.serverpackFolder.resolve("files.json"));
+		this.modMappings = null;
+	}
+
+	private Optional<ModMapping> getMapping(int projectID, int fileID) {
+		Optional<ModMapping> modMapping;
+		synchronized(this.modMappings) {
+			modMapping = this.modMappings.stream().filter(mod -> mod.projectID == projectID && mod.fileID == fileID).findAny();
+		}
+
+		modMapping.filter(mapping -> {
+			Path modFile = this.serverModsPath.resolve(mapping.fileName);
+			return Files.exists(modFile);
+		});
+
+		// check hash
+		modMapping.filter(mapping -> {
+			Path modFile = this.serverModsPath.resolve(mapping.fileName);
+			String hash = Utils.computeSha1(modFile);
+			return hash.equals(mapping.sha1);
+		});
+
+		return modMapping;
+	}
+	
+	public void doCleanup() {
+		super.doCleanup();
+		this.saveAndCloseMappings();
+	}
 
 	@Override
 	public void initialize() {
 		super.initialize();
+		
+		this.loadMappings();
 
 		// load modpack config
 		JsonObject packConfig = Utils.loadJson(getServerpackFolder().resolve(this.packConfig.<String>get("server.packfile"))).getAsJsonObject();
@@ -71,7 +155,8 @@ public class ServerSideHandler extends SideHandler {
 			throw new IllegalArgumentException("mods not specified in modpack configuration");
 		}
 
-		this.downloadThreadpool = Executors.newFixedThreadPool(Math.max(Runtime.getRuntime().availableProcessors() / 2, 1));
+		int numDownloadThreads = Math.max(Runtime.getRuntime().availableProcessors() / 2, 1);
+		this.downloadThreadpool = new ThreadPoolExecutor(1, numDownloadThreads, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<Runnable>());
 		this.singleExcecutor = Executors.newSingleThreadExecutor();
 		final List<CompletableFuture<Void>> futures = new ArrayList<>();
 
@@ -108,7 +193,13 @@ public class ServerSideHandler extends SideHandler {
 				}, downloadThreadpool)
 				.thenAcceptAsync(mapping -> {
 					if(mapping != null) {
-						manifestMods.add(mod);
+						var manifestMod = new JsonObject();
+						manifestMod.addProperty("source", "remote");
+						manifestMod.addProperty("url", mapping.downloadUrl());
+						manifestMod.addProperty("file", mapping.fileName());
+						manifestMod.addProperty("sha1", mapping.sha1());
+						manifestMods.add(manifestMod);
+						
 						this.loadedModNames.add(mapping.fileName());	
 					}
 				}, singleExcecutor);
@@ -269,5 +360,7 @@ public class ServerSideHandler extends SideHandler {
 	public int getPort() {
 		return this.packConfig.get("server.port");
 	}
+	
+	public static record ModMapping(int projectID, int fileID, String fileName, String downloadUrl, String sha1) {}
 
 }

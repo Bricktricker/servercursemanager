@@ -6,40 +6,44 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-
-import com.google.gson.JsonObject;
-
-import bricktricker.servercursemanager.SideHandler.ModMapping;
-import cpw.mods.forge.cursepacklocator.HashChecker;
+import bricktricker.servercursemanager.server.ServerSideHandler.ModMapping;
 
 public class CurseDownloader {
 
-	private static final Logger LOGGER = LogManager.getLogger();
-
 	public static ModMapping downloadMod(int projectID, int fileID, Path targetDir) throws IOException {
-		String metaDataURL = String.format("https://addons-ecs.forgesvc.net/api/v2/addon/%s/file/%s", projectID, fileID);
+		String metaDataURL = String.format("https://api.curse.tools/v1/cf/mods/%s/files/%s/download-url", projectID, fileID);
 		URL url = new URL(metaDataURL);
-		JsonObject metaData = Utils.loadJson(url.openStream()).getAsJsonObject();
-
-		String filename = metaData.getAsJsonPrimitive("fileName").getAsString().replaceAll("\\s+", "_");
-		String downloadURL = metaData.getAsJsonPrimitive("downloadUrl").getAsString();
+		String downloadURL = Utils.loadJson(url.openStream()).getAsJsonObject().getAsJsonPrimitive("data").getAsString();
+		
+		int lastSlash = downloadURL.lastIndexOf('/');
+		if(lastSlash == -1) {
+			throw new IOException("download URL does not contain a slash");
+		}
+		
+		String filename = downloadURL.substring(lastSlash+1).replaceAll("\\s+", "_");
 
 		Path target = targetDir.resolve(filename);
 
 		url = new URL(downloadURL);
 		Files.copy(url.openStream(), target, StandardCopyOption.REPLACE_EXISTING);
+		
+		String sha1Hash = Utils.computeSha1(target);
 
-		String modHash = String.valueOf(HashChecker.computeMurmurHash(target));
-		String expectedHash = String.valueOf(metaData.getAsJsonPrimitive("packageFingerprint").getAsLong());
-
-		if(!modHash.equals(expectedHash)) {
-			LOGGER.error("Could not download project {} file {}, expected hash {}, but got hash {}", projectID, fileID, expectedHash, modHash);
-			throw new IOException("Hash does not match!");
+		return new ModMapping(projectID, fileID, filename, downloadURL, sha1Hash);
+	}
+	
+	public static void downloadFile(String downloadURL, String filename, String sha1, Path targetDir) throws IOException {
+		Path target = targetDir.resolve(filename);
+		if(!Files.exists(target)) {
+			URL url = new URL(downloadURL);
+			Files.copy(url.openStream(), target, StandardCopyOption.REPLACE_EXISTING);
 		}
-
-		return new ModMapping(projectID, fileID, filename, modHash);
+		
+		String computedHash = Utils.computeSha1(target);
+		if(!computedHash.equals(sha1)) {
+			Files.delete(target);
+			throw new IOException("Wrong hash for downloaded file " + downloadURL);
+		}
 	}
 
 }

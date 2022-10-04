@@ -12,7 +12,7 @@ import java.util.function.Supplier;
 public class ModAccessor {
     public static String statusLine = "ServerPack: unknown";
 
-    public static Supplier<String> status() {
+    public static Supplier<String> getStatusLine() {
         return ()->statusLine;
     }
 }
