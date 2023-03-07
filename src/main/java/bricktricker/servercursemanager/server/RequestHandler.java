@@ -11,6 +11,7 @@ import org.apache.logging.log4j.Logger;
 
 import bricktricker.servercursemanager.Utils;
 import cpw.mods.forge.serverpacklocator.secure.ProfileKeyPairBasedSecurityManager;
+import cpw.mods.forge.serverpacklocator.secure.WhitelistVerificationHelper.AllowedStatus;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelFutureListener;
@@ -66,13 +67,16 @@ public class RequestHandler extends SimpleChannelInboundHandler<FullHttpRequest>
         	}
     		String challengeEnc = Base64.getEncoder().encodeToString(challenge);
     		sendReply(ctx, HttpResponseStatus.OK, challengeEnc);
-    		LOGGER.debug("Send challenge {} to client {} with id {}", challengeEnc, ctx.channel().remoteAddress(), ctx.channel().id().asShortText());
+    		LOGGER.debug("Send challenge {} to client {}", challengeEnc, ctx.channel().remoteAddress());
     		return;
     	}
 
     	challenge = ctx.channel().attr(CHALLENGE_ATTRUBUTE_KEY).get();
 		if(challenge == null) {
-			LOGGER.warn("Client {} tried to make a request, without requesting a challenge first, channel id {}", ctx.channel().remoteAddress(), ctx.channel().id().asShortText());
+			LOGGER.warn("Client {} tried to make a request, without requesting a challenge first. Request was {}",
+					ctx.channel().remoteAddress(),
+					ctx.channel().id().asShortText(),
+					msg.uri());
 			sendReply(ctx, HttpResponseStatus.BAD_REQUEST, "Request challenge first");
     		return;
     	}
@@ -83,10 +87,14 @@ public class RequestHandler extends SimpleChannelInboundHandler<FullHttpRequest>
             return;
         }
 		
-		boolean isAuthenticated = ProfileKeyPairBasedSecurityManager.getInstance().onServerConnectionRequest(msg, challenge);
-		if(!isAuthenticated) {
+		AllowedStatus isAuthenticated = ProfileKeyPairBasedSecurityManager.getInstance().onServerConnectionRequest(msg, challenge);
+		if(isAuthenticated == AllowedStatus.REJECTED) {
 			LOGGER.warn("Unauthenticated request from {}", ctx.channel().remoteAddress());
 			sendReply(ctx, HttpResponseStatus.UNAUTHORIZED, "Invalid Authentication");
+			return;
+		}else if(isAuthenticated == AllowedStatus.NOT_READY) {
+			LOGGER.info("Server not yet ready");
+			sendReply(ctx, new HttpResponseStatus(425, "Too Early"), "Too Early");
 			return;
 		}
 		

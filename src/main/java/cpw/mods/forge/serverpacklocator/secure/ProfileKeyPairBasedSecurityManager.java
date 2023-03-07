@@ -5,6 +5,8 @@ import com.mojang.authlib.minecraft.UserApiService;
 import com.mojang.authlib.yggdrasil.ServicesKeyInfo;
 import com.mojang.authlib.yggdrasil.YggdrasilAuthenticationService;
 import com.mojang.authlib.yggdrasil.response.KeyPairResponse;
+
+import cpw.mods.forge.serverpacklocator.secure.WhitelistVerificationHelper.AllowedStatus;
 import cpw.mods.modlauncher.ArgumentHandler;
 import cpw.mods.modlauncher.Launcher;
 import io.netty.handler.codec.http.FullHttpRequest;
@@ -220,106 +222,106 @@ public final class ProfileKeyPairBasedSecurityManager
         connection.setRequestProperty("ChallengeSignature", Base64.getEncoder().encodeToString(signingHandler.signer().sign(challenge)));
     }
 
-    public boolean onServerConnectionRequest(final FullHttpRequest msg, byte[] challenge)
+    public AllowedStatus onServerConnectionRequest(final FullHttpRequest msg, byte[] challenge)
     {
         final var headers = msg.headers();
         final String authentication = headers.get("Authentication");
         if (!Objects.equals(authentication, "SignedId")) {
             LOGGER.warn("External client attempted login without proper authentication header setup!");
-            return false;
+            return AllowedStatus.REJECTED;
         }
 
         final String authenticationId = headers.get("AuthenticationId");
         if (authenticationId == null)
         {
             LOGGER.warn("External client attempted login without session id!");
-            return false;
+            return AllowedStatus.REJECTED;
         }
         final UUID sessionId;
         try {
             sessionId = UUID.fromString(authenticationId);
         } catch (IllegalArgumentException e) {
             LOGGER.warn("External client attempted login with invalid session id format: " + authenticationId);
-            return false;
+            return AllowedStatus.REJECTED;
         }
 
         final String authenticationSignature = headers.get("AuthenticationSignature");
         if (authenticationSignature == null) {
             LOGGER.warn("External client attempted login without signature!");
-            return false;
+            return AllowedStatus.REJECTED;
         }
         final byte[] encryptedSessionHashPayload;
         try {
             encryptedSessionHashPayload = Base64.getDecoder().decode(authenticationSignature);
         } catch (Throwable throwable) {
             LOGGER.warn("External client attempted to login with a signature which was not decode-able: " + authenticationSignature);
-            return false;
+            return AllowedStatus.REJECTED;
         }
 
         final String publicKeyString = headers.get("AuthenticationKey");
         if (publicKeyString == null) {
             LOGGER.warn("External client attempted login without public key!");
-            return false;
+            return AllowedStatus.REJECTED;
         }
         final String decodedPublicKey;
         try {
             decodedPublicKey = new String(Base64.getDecoder().decode(publicKeyString), StandardCharsets.UTF_8);
         } catch (Throwable throwable) {
             LOGGER.warn("External client attempted to login with a public key which was not decode-able: " + publicKeyString);
-            return false;
+            return AllowedStatus.REJECTED;
         }
         final PublicKey publicKey;
         try {
             publicKey = Crypt.stringToRsaPublicKey(decodedPublicKey);
         } catch (Throwable throwable) {
             LOGGER.warn("External client attempted to login with a public key which was not in RSA format: " + decodedPublicKey);
-            return false;
+            return AllowedStatus.REJECTED;
         }
 
         final String authenticationExpire = headers.get("AuthenticationKeyExpire");
         if (authenticationExpire == null) {
             LOGGER.warn("External client attempted login without expire information!");
-            return false;
+            return AllowedStatus.REJECTED;
         }
         final String decodedAuthenticationExpire;
         try {
             decodedAuthenticationExpire = new String(Base64.getDecoder().decode(authenticationExpire), StandardCharsets.UTF_8);
         } catch (Throwable throwable) {
             LOGGER.warn("External client attempted to login with expire information which was not decode-able: " + publicKeyString);
-            return false;
+            return AllowedStatus.REJECTED;
         }
         final Instant expire;
         try {
             expire = Instant.parse(decodedAuthenticationExpire);
         } catch (DateTimeParseException e) {
             LOGGER.warn("External client attempted login without a validly formatted expire information: " + authenticationExpire);
-            return false;
+            return AllowedStatus.REJECTED;
         }
 
         final String authenticationKeySignature = headers.get("AuthenticationKeySignature");
         if (authenticationKeySignature == null) {
             LOGGER.warn("External client attempted login without a key signature!");
-            return false;
+            return AllowedStatus.REJECTED;
         }
         final byte[] keySignature;
         try {
             keySignature = Base64.getDecoder().decode(authenticationKeySignature);
         } catch (Throwable throwable) {
             LOGGER.warn("External client attempted login with a key signature which was not decode-able: " + authenticationKeySignature);
-            return false;
+            return AllowedStatus.REJECTED;
         }
         
         final String challengeSignatureStr =  headers.get("ChallengeSignature");
         if(challengeSignatureStr == null) {
         	LOGGER.warn("External client attempted login without a nonce signature!");
-        	return false;
+        	return AllowedStatus.REJECTED;
         }
         final byte[] challengeSignature;
         try{
         	challengeSignature = Base64.getDecoder().decode(challengeSignatureStr);	
         } catch (Throwable throwable) {
             LOGGER.warn("External client attempted login with a nonce signature which was not decode-able: " + challengeSignatureStr);
-            return false;
+            return AllowedStatus.REJECTED;
         }
 
         final PublicKeyData keyData = new PublicKeyData(
@@ -332,22 +334,22 @@ public final class ProfileKeyPairBasedSecurityManager
             validatePublicKey(keyData, sessionId, validator);
             if (!validateSignedSessionId(sessionId, keyData.validator(), encryptedSessionHashPayload)) {
                 LOGGER.warn("External client attempted login with an invalid signature!");
-                return false;
+                return AllowedStatus.REJECTED;
             }
             if(!keyData.validator().validate(challenge, challengeSignature)) {
             	LOGGER.warn("External client attempted login with an invalid challenge signature!");
-                return false;
+                return AllowedStatus.REJECTED;
             }
-            if (!WhitelistVerificationHelper.getInstance().isAllowed(sessionId)) {
-                LOGGER.warn("External client attempted login with a session id which is not on the whitelist!");
-                return false;
+            AllowedStatus whitelistStatus = WhitelistVerificationHelper.getInstance().isAllowed(sessionId);
+            if(whitelistStatus == AllowedStatus.REJECTED) {
+            	LOGGER.warn("External client attempted login with a session id which is not on the whitelist!");
             }
-            return true;
+            return whitelistStatus;
         }
         catch (Exception e)
         {
             LOGGER.warn("External client failed to authenticate.", e);
-            return false;
+            return AllowedStatus.REJECTED;
         }
     }
 

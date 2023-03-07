@@ -20,7 +20,19 @@ public final class WhitelistVerificationHelper
     private WhitelistVerificationHelper()
     {
     }
-    public boolean isAllowed(final UUID sessionId) {
-        return !ModAccessor.getIsWhiteListEnabled().get().join() || ModAccessor.getIsWhiteListed().apply(sessionId).join();
+    public AllowedStatus isAllowed(final UUID sessionId) {
+    	if(ModAccessor.getIsWhiteListEnabled() == null || ModAccessor.getIsWhiteListed() == null) {
+    		return AllowedStatus.NOT_READY;
+    	}
+    	if(!ModAccessor.getIsWhiteListEnabled().get().join() || ModAccessor.getIsWhiteListed().apply(sessionId).join()) {
+    		return AllowedStatus.ALLOWED;
+    	}
+        return AllowedStatus.REJECTED;
+    }
+    
+    public static enum AllowedStatus  {
+    	ALLOWED,
+    	REJECTED,
+    	NOT_READY
     }
 }

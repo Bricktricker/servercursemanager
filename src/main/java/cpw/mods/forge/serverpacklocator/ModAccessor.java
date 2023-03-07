@@ -11,8 +11,8 @@ import java.util.function.Supplier;
  */
 public class ModAccessor {
     private static String statusLine = "ServerPack: unknown";
-    private static Function<UUID, CompletableFuture<Boolean>> isWhiteListed = (uuid) -> CompletableFuture.completedFuture(false);
-    private static Supplier<CompletableFuture<Boolean>> isWhiteListEnabled = () -> CompletableFuture.completedFuture(false);
+    private static Function<UUID, CompletableFuture<Boolean>> isWhiteListed = null;
+    private static Supplier<CompletableFuture<Boolean>> isWhiteListEnabled = null;
 
     public static void setStatusLine(final String statusLine)
     {

@@ -11,9 +11,9 @@ import bricktricker.servercursemanager.server.ServerSideHandler.ModMapping;
 public class CurseDownloader {
 
 	public static ModMapping downloadMod(int projectID, int fileID, Path targetDir) throws IOException {
-		String metaDataURL = String.format("https://api.curse.tools/v1/cf/mods/%s/files/%s/download-url", projectID, fileID);
+		String metaDataURL = String.format("https://api.curse.tools/v1/cf/mods/%s/files/%s/", projectID, fileID);
 		URL url = new URL(metaDataURL);
-		String downloadURL = Utils.loadJson(url.openStream()).getAsJsonObject().getAsJsonPrimitive("data").getAsString();
+		String downloadURL = Utils.loadJson(url.openStream()).getAsJsonObject().getAsJsonObject("data").getAsJsonPrimitive("downloadUrl").getAsString();
 		
 		int lastSlash = downloadURL.lastIndexOf('/');
 		if(lastSlash == -1) {

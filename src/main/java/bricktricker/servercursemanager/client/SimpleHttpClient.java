@@ -51,37 +51,54 @@ public class SimpleHttpClient {
 			throw new UncheckedIOException(e);
 		}
         
-        URL url;
-		try {
-			url = new URL(server + "modpack.zip?hash=" + currentModpackHash);
-		}catch(MalformedURLException e) {
-			throw new UncheckedIOException(e);
-		}
-		
-		try {
-			var connection = url.openConnection();
-			ProfileKeyPairBasedSecurityManager.getInstance().onClientConnectionCreation(connection, this.challenge);
-        
-	        try (BufferedInputStream in = new BufferedInputStream(connection.getInputStream())) {
-	        	int code = ((HttpURLConnection)connection).getResponseCode();
-	        	if(code == 200) {
-		        	LaunchEnvironmentHandler.INSTANCE.addProgressMessage("Receiving modpack.zip");
-		        	final Path modpack = clientSideHandler.getServerpackFolder().resolve("modpack.zip");
-		        	try (OutputStream os = Files.newOutputStream(modpack)) {
-		                in.transferTo(os);
-		                downloadSuccessful = true;
-		            } catch (IOException e) {
-		                LOGGER.catching(e);
-		            }	
-	        	}else if(code == 304){
-	        		LaunchEnvironmentHandler.INSTANCE.addProgressMessage("Using old modpack.zip");
-	        		downloadSuccessful = true;
-	        	}else {
-	        		LOGGER.error("Could not fetch modpack.zip, got status code {}", code);
-	        	}
-	        }
-        } catch (IOException e) {
-            throw new IllegalStateException("Failed to download manifest", e);
+        // try 5 times
+        for(int i = 0; i < 5; i++) {
+        	URL url;
+    		try {
+    			url = new URL(server + "modpack.zip?hash=" + currentModpackHash);
+    		}catch(MalformedURLException e) {
+    			throw new UncheckedIOException(e);
+    		}
+    		
+    		
+    		try {
+    			var connection = url.openConnection();
+    			ProfileKeyPairBasedSecurityManager.getInstance().onClientConnectionCreation(connection, this.challenge);
+            
+    	        try (BufferedInputStream in = new BufferedInputStream(connection.getInputStream())) {
+    	        	int code = ((HttpURLConnection)connection).getResponseCode();
+    	        	if(code == 200) {
+    		        	LaunchEnvironmentHandler.INSTANCE.addProgressMessage("Receiving modpack.zip");
+    		        	final Path modpack = clientSideHandler.getServerpackFolder().resolve("modpack.zip");
+    		        	try (OutputStream os = Files.newOutputStream(modpack)) {
+    		                in.transferTo(os);
+    		                downloadSuccessful = true;
+    		            } catch (IOException e) {
+    		                LOGGER.catching(e);
+    		            }	
+    	        	}else if(code == 304){
+    	        		LaunchEnvironmentHandler.INSTANCE.addProgressMessage("Using old modpack.zip");
+    	        		downloadSuccessful = true;
+    	        	}else if(code == 425) {
+    	        		// Server hasn't fully started yet. Wait 10sec and then try again
+    	        		LaunchEnvironmentHandler.INSTANCE.addProgressMessage("Server not ready yet");
+    	        		try {
+							Thread.sleep(10000);
+						}catch(InterruptedException e) {
+							LOGGER.catching(e);
+						}
+    	        		downloadSuccessful = false;
+    	        	}else {
+    	        		LOGGER.error("Could not fetch modpack.zip, got status code {}", code);
+    	        	}
+    	        }
+            } catch (IOException e) {
+                throw new IllegalStateException("Failed to download manifest", e);
+            }
+    		
+    		if(downloadSuccessful) {
+    			break;
+    		}
         }
         
         if (!downloadSuccessful) {
