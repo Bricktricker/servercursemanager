@@ -66,7 +66,7 @@ public class ServerSideHandler extends SideHandler {
 
 	protected void loadMappings() {
 		this.modMappings = new ArrayList<>();
-		Path modMappingsFile = this.serverpackFolder.resolve("files.json");
+		Path modMappingsFile = this.serverModsPath.resolve("files.json");
 		if(!Files.exists(modMappingsFile)) {
 			return;
 		}
@@ -111,7 +111,7 @@ public class ServerSideHandler extends SideHandler {
 			mappingArray.add(mod);
 		}
 
-		Utils.saveJson(mappingArray, this.serverpackFolder.resolve("files.json"));
+		Utils.saveJson(mappingArray, this.serverModsPath.resolve("files.json"));
 		this.modMappings = null;
 	}
 
