@@ -12,6 +12,7 @@ import java.security.SignatureException;
 
 /**
  * Copied from https://github.com/cpw/serverpacklocator/blob/4496cf9ba45515b286bde1a3a79513e75b69754e/src/main/java/cpw/mods/forge/serverpacklocator/secure/SignatureValidator.java
+ * @author marchermans
  * 
  */
 public interface SignatureValidator {

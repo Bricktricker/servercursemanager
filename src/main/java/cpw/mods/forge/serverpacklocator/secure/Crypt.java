@@ -12,6 +12,10 @@ import java.util.Base64;
 
 /**
  * Copied from https://github.com/cpw/serverpacklocator/blob/4496cf9ba45515b286bde1a3a79513e75b69754e/src/main/java/cpw/mods/forge/serverpacklocator/secure/Crypt.java
+ * @author marchermans
+ * 
+ * Changes:
+ * Removed rsaPublicKeyToString function
  */
 public final class Crypt {
     private static final String PEM_RSA_PRIVATE_KEY_HEADER = "-----BEGIN RSA PRIVATE KEY-----";
@@ -47,14 +51,6 @@ public final class Crypt {
 
     public static PublicKey stringToRsaPublicKey(String keyString) throws RuntimeException {
         return rsaStringToKey(keyString, RSA_PUBLIC_KEY_HEADER, RSA_PUBLIC_KEY_FOOTER, Crypt::byteToPublicKey);
-    }
-
-    public static String rsaPublicKeyToString(PublicKey key) {
-        if (!"RSA".equals(key.getAlgorithm())) {
-            throw new IllegalArgumentException("Public key must be RSA");
-        } else {
-            return "-----BEGIN RSA PUBLIC KEY-----\n" + MIME_ENCODER.encodeToString(key.getEncoded()) + "\n-----END RSA PUBLIC KEY-----\n";
-        }
     }
 
     private static PrivateKey byteToPrivateKey(byte[] keyBytes) throws RuntimeException {

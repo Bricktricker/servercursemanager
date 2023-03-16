@@ -7,7 +7,7 @@ import java.util.function.Supplier;
 
 /**
  * Copied from https://github.com/cpw/serverpacklocator/blob/4496cf9ba45515b286bde1a3a79513e75b69754e/src/main/java/cpw/mods/forge/serverpacklocator/ModAccessor.java
- * 
+ * @author cpw, marchermans
  */
 public class ModAccessor {
     private static String statusLine = "ServerPack: unknown";

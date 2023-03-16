@@ -12,9 +12,7 @@ import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Base64;
-import java.util.Optional;
 import java.util.TimeZone;
-import java.util.function.Consumer;
 import java.util.zip.ZipEntry;
 
 import com.google.gson.JsonElement;
@@ -76,7 +74,26 @@ public class Utils {
 		}
 	}
 	
-	public static String computeSha1(InputStream is) {
+	public static byte[] computeSha1(InputStream is) {
+		try {
+			MessageDigest digest = MessageDigest.getInstance("SHA-1");
+			
+			byte[] buffer = new byte[4096];
+			int len = is.read(buffer);
+			while (len != -1) {
+				digest.update(buffer, 0, len);
+	            len = is.read(buffer);
+	        }
+			
+			return digest.digest();
+		}catch(NoSuchAlgorithmException e) {
+			throw new RuntimeException(e);
+		}catch(IOException e) {
+			throw new UncheckedIOException(e);
+		}
+	}
+	
+	public static String computeSha1Str(InputStream is) {
 		try {
 			MessageDigest digest = MessageDigest.getInstance("SHA-1");
 			
@@ -95,9 +112,17 @@ public class Utils {
 		}
 	}
 	
-	public static String computeSha1(Path file) {
+	public static byte[] computeSha1(Path file) {
 		try(var is = Files.newInputStream(file)){
 			return computeSha1(is);
+		}catch(IOException e) {
+			throw new UncheckedIOException(e);
+		}
+	}
+	
+	public static String computeSha1Str(Path file) {
+		try(var is = Files.newInputStream(file)){
+			return computeSha1Str(is);
 		}catch(IOException e) {
 			throw new UncheckedIOException(e);
 		}
@@ -112,15 +137,5 @@ public class Utils {
 		ret.setTime(628041600000L);
 		TimeZone.setDefault(_default);
 		return ret;
-	}
-
-	// Copied from:
-	// https://github.com/cpw/serverpacklocator/blob/e0e101c8db9008e7b9f9c8e0841fa92bf69ffcdb/src/main/java/cpw/mods/forge/serverpacklocator/OptionalHelper.java#L8
-	public static <T> void ifPresentOrElse(Optional<T> optional, Consumer<T> action, Runnable orElse) {
-		if(optional.isPresent()) {
-			optional.ifPresent(action);
-		}else {
-			orElse.run();
-		}
 	}
 }

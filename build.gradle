@@ -2,11 +2,10 @@ plugins {
     id 'maven-publish'
     id 'java-library'
     id 'eclipse'
-    id 'com.github.johnrengelman.shadow' version '7.1.2'
 }
 
 group = 'bricktricker'
-version = '1.2.0'
+version = '1.3.0'
 java.toolchain.languageVersion = JavaLanguageVersion.of(17)
 
 repositories {
@@ -36,28 +35,10 @@ jar {
     }
 }
 
-shadowJar {
-    archiveClassifier = 'shadow'
-    configurations = [project.configurations.shadow]
-    relocate 'io.netty', 'shadow.io.netty'
- 
-    manifest {
-        attributes([
-                'Specification-Title':      project.name,
-                'Specification-Vendor':     'bricktricker',
-                'Specification-Version':    project.version,
-                'Implementation-Title':     project.name,
-                'Implementation-Version':   project.version,
-                'Implementation-Vendor':    'bricktricker',
-                'Automatic-Module-Name':    'servercursemanager',
-        ] as LinkedHashMap)
-    }
-}
-
 task distributionJar(type: Jar) {
     archiveClassifier = 'all'
-    dependsOn shadowJar
-    from project.zipTree(tasks.shadowJar.archiveFile)
+    dependsOn jar
+    from project.zipTree(tasks.jar.archiveFile)
     manifest {
         attributes([
                 'Specification-Title':      project.name,
@@ -80,26 +61,20 @@ dependencies {
     implementation('net.minecraftforge:forgespi:6.0.0')
     implementation('com.electronwill.night-config:core:3.6.4')
     implementation('com.electronwill.night-config:toml:3.6.4')
-    implementation('com.google.code.gson:gson:2.8.9')
-    implementation("com.mojang:authlib:3.16.29") // 3.11.49
-    
-    shadow("io.netty:netty-all:4.1.25.Final")
-    //We only need to shadow the 'netty-codec-http' jar, the rest is included in Minecraft, but not sure how to do it
-    /*
-    implementation('io.netty:netty-common:4.1.77.Final')
-    implementation('io.netty:netty-buffer:4.1.77.Final')
-    implementation('io.netty:netty-handler:4.1.77.Final')
-    implementation('io.netty:netty-codec:4.1.77.Final')
-    shadow('io.netty:netty-codec-http:4.1.77.Final') // shadow
-    */
-    
-    implementation('org.apache.logging.log4j:log4j-api:2.17.0')
+    implementation('com.google.code.gson:gson:2.10')
+    implementation("com.mojang:authlib:3.16.29")
+
+    implementation('io.netty:netty-common:4.1.82.Final')
+    implementation('io.netty:netty-buffer:4.1.82.Final')
+    implementation('io.netty:netty-handler:4.1.82.Final')
+    implementation('io.netty:netty-codec:4.1.82.Final')
+
+    implementation('org.apache.logging.log4j:log4j-api:2.19.0')
     implementation('org.apache.commons:commons-lang3:3.12.0')
 }
 
 artifacts {
     archives jar
-    archives shadowJar
     archives distributionJar
 }
 

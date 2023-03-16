@@ -29,10 +29,9 @@ import bricktricker.servercursemanager.CurseDownloader;
 import bricktricker.servercursemanager.SideHandler;
 import bricktricker.servercursemanager.Utils;
 import cpw.mods.forge.serverpacklocator.secure.ProfileKeyPairBasedSecurityManager;
-import cpw.mods.forge.serverpacklocator.server.SimpleHttpServer;
 
 public class ServerSideHandler extends SideHandler {
-	
+
 	private List<ModMapping> modMappings;
 
 	public ServerSideHandler(Path gameDir) {
@@ -64,7 +63,7 @@ public class ServerSideHandler extends SideHandler {
 	public boolean isValid() {
 		return Files.exists(this.getServerpackFolder().resolve(this.packConfig.<String>get("server.packfile")));
 	}
-	
+
 	protected void loadMappings() {
 		this.modMappings = new ArrayList<>();
 		Path modMappingsFile = this.serverpackFolder.resolve("files.json");
@@ -81,9 +80,10 @@ public class ServerSideHandler extends SideHandler {
 				String fileName = mod.getAsJsonPrimitive("fileName").getAsString();
 				String downloadUrl = mod.getAsJsonPrimitive("url").getAsString();
 				String sha1 = mod.getAsJsonPrimitive("sha1").getAsString();
-				
+	
 				return new ModMapping(projectID, fileID, fileName, downloadUrl, sha1);
-		}).forEach(modMappings::add);
+			})
+			.forEach(modMappings::add);
 	}
 
 	private void addMapping(ModMapping mapping) {
@@ -129,13 +129,13 @@ public class ServerSideHandler extends SideHandler {
 		// check hash
 		modMapping.filter(mapping -> {
 			Path modFile = this.serverModsPath.resolve(mapping.fileName);
-			String hash = Utils.computeSha1(modFile);
+			String hash = Utils.computeSha1Str(modFile);
 			return hash.equals(mapping.sha1);
 		});
 
 		return modMapping;
 	}
-	
+
 	public void doCleanup() {
 		super.doCleanup();
 		this.saveAndCloseMappings();
@@ -144,7 +144,7 @@ public class ServerSideHandler extends SideHandler {
 	@Override
 	public void initialize() {
 		super.initialize();
-		
+
 		this.loadMappings();
 
 		// load modpack config
@@ -188,10 +188,9 @@ public class ServerSideHandler extends SideHandler {
 							return null;
 						}
 					});
-					
+
 					return mapping;
-				}, downloadThreadpool)
-				.thenAcceptAsync(mapping -> {
+				}, downloadThreadpool).thenAcceptAsync(mapping -> {
 					if(mapping != null) {
 						var manifestMod = new JsonObject();
 						manifestMod.addProperty("source", "remote");
@@ -199,18 +198,18 @@ public class ServerSideHandler extends SideHandler {
 						manifestMod.addProperty("file", mapping.fileName());
 						manifestMod.addProperty("sha1", mapping.sha1());
 						manifestMods.add(manifestMod);
-						
-						this.loadedModNames.add(mapping.fileName());	
+
+						this.loadedModNames.add(mapping.fileName());
 					}
 				}, singleExcecutor);
-				
+
 				futures.add(future);
-				
+
 			}else if("local".equalsIgnoreCase(source)) {
 				String modPath = mod.getAsJsonPrimitive("mod").getAsString();
 				Path sourcePath = Paths.get(modPath);
 				String modName = sourcePath.getFileName().toString();
-				
+
 				CompletableFuture<Void> future = CompletableFuture.supplyAsync(() -> {
 					if(!Files.isRegularFile(sourcePath) || !Files.exists(sourcePath)) {
 						LOGGER.error("mod path {} does not point to a file", modPath);
@@ -226,10 +225,9 @@ public class ServerSideHandler extends SideHandler {
 					JsonObject modManifest = new JsonObject();
 					modManifest.addProperty("source", source);
 					modManifest.addProperty("file", modName);
-					
+
 					return modManifest;
-				}, downloadThreadpool)
-				.thenAcceptAsync(modManifest -> {
+				}, downloadThreadpool).thenAcceptAsync(modManifest -> {
 					if(modManifest != null) {
 						ZipEntry entry = Utils.getStableEntry("mods/" + modName);
 						try {
@@ -247,7 +245,7 @@ public class ServerSideHandler extends SideHandler {
 				}, singleExcecutor);
 
 				futures.add(future);
-				
+
 			}else {
 				LOGGER.error("Unkown source {} for a mod", source);
 				continue;
@@ -290,14 +288,12 @@ public class ServerSideHandler extends SideHandler {
 								s.append("/");
 							}
 							s.append(relTarget.getFileName());
-							
+
 							String targetStr = s.toString();
-							
-							boolean allreadyPresent = filesToCopy.stream()
-								.map(Pair::getRight)
-								.anyMatch(x -> x.equals(targetStr));
-							
-							if(!allreadyPresent) {
+
+							boolean alreadyPresent = filesToCopy.stream().map(Pair::getRight).anyMatch(x -> x.equals(targetStr));
+
+							if(!alreadyPresent) {
 								filesToCopy.add(Pair.of(p, targetStr));
 							}
 						});
@@ -309,7 +305,7 @@ public class ServerSideHandler extends SideHandler {
 					filesToCopy.add(Pair.of(filePath, target));
 				}
 			}
-			
+
 			CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
 				for(Pair<Path, String> p : filesToCopy) {
 					String pathInZip = SideHandler.ADDITIONAL + "/" + p.getRight();
@@ -328,7 +324,7 @@ public class ServerSideHandler extends SideHandler {
 
 			futures.add(future);
 		}
-		
+
 		CompletableFuture<Void> downloadTask = CompletableFuture.allOf(futures.toArray(new CompletableFuture[futures.size()]));
 		this.installTask = downloadTask.thenRunAsync(() -> {
 
@@ -338,7 +334,7 @@ public class ServerSideHandler extends SideHandler {
 			manifest.add(SideHandler.ADDITIONAL, manifestAdditional);
 			CopyOption copyOption = packConfig.has("copyOption") ? CopyOption.getOption(packConfig.getAsJsonPrimitive("copyOption").getAsString()) : CopyOption.OVERWRITE;
 			manifest.addProperty("copyOption", copyOption.configName());
-	
+
 			try {
 				ZipEntry manifestEntry = Utils.getStableEntry("manifest.json");
 				zos.putNextEntry(manifestEntry);
@@ -349,13 +345,13 @@ public class ServerSideHandler extends SideHandler {
 				LOGGER.catching(e);
 				return;
 			}
-	
+
 			byte[] packData = baos.toByteArray();
-			
-			SimpleHttpServer.run(this, packData);
-		
+
+			RequestServer.run(this, packData);
+
 		}, r -> r.run());
-		
+
 		// Initialize ProfileKeyPairBasedSecurityManager
 		ProfileKeyPairBasedSecurityManager.getInstance();
 	}
@@ -363,7 +359,8 @@ public class ServerSideHandler extends SideHandler {
 	public int getPort() {
 		return this.packConfig.get("server.port");
 	}
-	
-	public static record ModMapping(int projectID, int fileID, String fileName, String downloadUrl, String sha1) {}
+
+	public static record ModMapping(int projectID, int fileID, String fileName, String downloadUrl, String sha1) {
+	}
 
 }

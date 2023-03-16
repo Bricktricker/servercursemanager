@@ -6,39 +6,29 @@ import com.mojang.authlib.yggdrasil.ServicesKeyInfo;
 import com.mojang.authlib.yggdrasil.YggdrasilAuthenticationService;
 import com.mojang.authlib.yggdrasil.response.KeyPairResponse;
 
-import cpw.mods.forge.serverpacklocator.secure.WhitelistVerificationHelper.AllowedStatus;
 import cpw.mods.modlauncher.ArgumentHandler;
 import cpw.mods.modlauncher.Launcher;
-import io.netty.handler.codec.http.FullHttpRequest;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 
 import java.lang.reflect.Field;
 import java.net.Proxy;
-import java.net.URLConnection;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.time.Instant;
-import java.time.format.DateTimeParseException;
-import java.util.Base64;
 import java.util.Objects;
 import java.util.UUID;
 
 /**
  * Based on https://github.com/cpw/serverpacklocator/blob/4496cf9ba45515b286bde1a3a79513e75b69754e/src/main/java/cpw/mods/forge/serverpacklocator/secure/ProfileKeyPairBasedSecurityManager.java
+ * @author marchermans
  * 
  * Removed base interface
- * Removed sessionIdPayload field
- * Added challenge from https://github.com/marchermans/serverpacklocator/commit/634268e312bb68adb163ba953c05f7d4e7e60faa
+ * Renamed sessionId => playerUUID
+ * Removed all the HTTP Based methods
  */
 public final class ProfileKeyPairBasedSecurityManager
 {
-    private static final Logger LOGGER = LogManager.getLogger();
     private static final ProfileKeyPairBasedSecurityManager INSTANCE = new ProfileKeyPairBasedSecurityManager();
     private static final UUID DEFAULT_NILL_UUID = new UUID(0L, 0L);
 
@@ -47,16 +37,27 @@ public final class ProfileKeyPairBasedSecurityManager
         return INSTANCE;
     }
 
-    private final SigningHandler signingHandler;
-    private final UUID sessionId;
-
-    private final SignatureValidator validator;
+    private final SigningHandler playerSigningHandler;
+    private final UUID playerUUID;
+    private final SignatureValidator mojangValidator;
 
     private ProfileKeyPairBasedSecurityManager()
     {
-        signingHandler = getSigningHandler();
-        sessionId = getSessionId();
-        validator = getSignatureValidator();
+        playerSigningHandler = fetchSigningHandler();
+        playerUUID = fetchPlayerUUID();
+        mojangValidator = fetchMojangValidator();
+    }
+    
+    public UUID getPlayerUUID() {
+    	return this.playerUUID;
+    }
+    
+    public SignatureValidator getMojangValdiator() {
+    	return this.mojangValidator;
+    }
+    
+    public SigningHandler getSigningHandler() {
+    	return this.playerSigningHandler;
     }
 
     private static ArgumentHandler getArgumentHandler() {
@@ -84,7 +85,7 @@ public final class ProfileKeyPairBasedSecurityManager
         }
     }
 
-    private static String getAccessToken() {
+    private static String fetchAccessToken() {
         final String[] arguments = getLaunchArguments();
         for (int i = 0; i < arguments.length; i++)
         {
@@ -97,7 +98,7 @@ public final class ProfileKeyPairBasedSecurityManager
         return "";
     }
 
-    private static UUID getSessionId() {
+    private static UUID fetchPlayerUUID() {
         final String[] arguments = getLaunchArguments();
         for (int i = 0; i < arguments.length; i++)
         {
@@ -115,7 +116,7 @@ public final class ProfileKeyPairBasedSecurityManager
     }
 
     private static UserApiService getApiService() {
-        final String accessToken = getAccessToken();
+        final String accessToken = fetchAccessToken();
         final YggdrasilAuthenticationService authenticationService = getAuthenticationService();
         if (accessToken.isBlank())
             return UserApiService.OFFLINE;
@@ -130,7 +131,7 @@ public final class ProfileKeyPairBasedSecurityManager
         }
     }
 
-    private static KeyPairResponse getKeyPair() {
+    public static KeyPairResponse getKeyPair() {
         final UserApiService apiService = getApiService();
         return apiService.getKeyPair();
     }
@@ -147,7 +148,7 @@ public final class ProfileKeyPairBasedSecurityManager
                 keyPairResponse.getPublicKeySignature().array()));
     }
 
-    private static SigningHandler getSigningHandler() {
+    private static SigningHandler fetchSigningHandler() {
         final ProfileKeyPair profileKeyPair = getProfileKeyPair();
         if (profileKeyPair == null)
             return null;
@@ -155,7 +156,7 @@ public final class ProfileKeyPairBasedSecurityManager
         return new SigningHandler(profileKeyPair);
     }
 
-    private static SignatureValidator getSignatureValidator() {
+    private static SignatureValidator fetchMojangValidator() {
         final YggdrasilAuthenticationService authenticationService = getAuthenticationService();
 
         final ServicesKeyInfo keyInfo = authenticationService.getServicesKey();
@@ -164,210 +165,36 @@ public final class ProfileKeyPairBasedSecurityManager
 
         return SignatureValidator.from(keyInfo);
     }
-
-    private static void validatePublicKey(PublicKeyData keyData, UUID sessionId, SignatureValidator systemValidator) throws Exception
+    
+    public void validatePublicKey(PublicKeyData keyData, UUID sessionId) throws Exception
     {
-        if (keyData.key() == null) {
+    	if (keyData.key() == null) {
             throw new Exception("Missing public key!");
         } else {
             if (keyData.expiresAt().isBefore(Instant.now())) {
                 throw new Exception("Public key has expired!");
             }
-            if (!keyData.verifySessionId(systemValidator, sessionId)) {
+            if (!keyData.verifyPlayerId(this.mojangValidator, sessionId)) {
                 throw new Exception("Invalid public key!");
             }
         }
     }
 
-    private static byte[] buildMessageHashFromSignature(final UUID sessionId)
-    {
-        final byte[] sessionIdPayload = new byte[16];
-        ByteBuffer.wrap(sessionIdPayload).order(ByteOrder.BIG_ENDIAN).putLong(sessionId.getMostSignificantBits()).putLong(sessionId.getLeastSignificantBits());
-
-        try
-        {
-            MessageDigest md = MessageDigest.getInstance("SHA-256");
-            return md.digest(sessionIdPayload);
-        }
-        catch (NoSuchAlgorithmException e)
-        {
-            throw new RuntimeException("Failed to get SHA-256 message digest", e);
-        }
-    }
-
-    private static String getSignedSessionId(final UUID sessionId, final Signer signer) {
-        byte[] messageHash = buildMessageHashFromSignature(sessionId);
-
-        final byte[] signedPayload = signer.sign(messageHash);
-        return Base64.getEncoder().encodeToString(signedPayload);
-    }
-
-    private static boolean validateSignedSessionId(final UUID sessionId, final SignatureValidator publicKeySignature, final byte[] encryptedSessionHashPayload) {
-        return publicKeySignature.validate(buildMessageHashFromSignature(sessionId), encryptedSessionHashPayload);
-    }
-
-    public void onClientConnectionCreation(final URLConnection connection, byte[] challenge)
-    {
-        if (signingHandler == null || sessionId.compareTo(DEFAULT_NILL_UUID) == 0) {
-            LOGGER.warn("No signing handler is available for the current session (Missing keypair). Stuff might not work since we can not sign the requests!");
-            return;
-        }
-
-        connection.setRequestProperty("Authentication", "SignedId");
-        connection.setRequestProperty("AuthenticationId", sessionId.toString());
-        connection.setRequestProperty("AuthenticationSignature", getSignedSessionId(sessionId, signingHandler.signer()));
-        connection.setRequestProperty("AuthenticationKey", Base64.getEncoder().encodeToString(Crypt.rsaPublicKeyToString(signingHandler.keyPair().publicKeyData().key()).getBytes(StandardCharsets.UTF_8)));
-        connection.setRequestProperty("AuthenticationKeyExpire", Base64.getEncoder().encodeToString(signingHandler.keyPair().publicKeyData().expiresAt().toString().getBytes(StandardCharsets.UTF_8)));
-        connection.setRequestProperty("AuthenticationKeySignature", Base64.getEncoder().encodeToString(signingHandler.keyPair().publicKeyData().publicKeySignature()));
-        connection.setRequestProperty("ChallengeSignature", Base64.getEncoder().encodeToString(signingHandler.signer().sign(challenge)));
-    }
-
-    public AllowedStatus onServerConnectionRequest(final FullHttpRequest msg, byte[] challenge)
-    {
-        final var headers = msg.headers();
-        final String authentication = headers.get("Authentication");
-        if (!Objects.equals(authentication, "SignedId")) {
-            LOGGER.warn("External client attempted login without proper authentication header setup!");
-            return AllowedStatus.REJECTED;
-        }
-
-        final String authenticationId = headers.get("AuthenticationId");
-        if (authenticationId == null)
-        {
-            LOGGER.warn("External client attempted login without session id!");
-            return AllowedStatus.REJECTED;
-        }
-        final UUID sessionId;
-        try {
-            sessionId = UUID.fromString(authenticationId);
-        } catch (IllegalArgumentException e) {
-            LOGGER.warn("External client attempted login with invalid session id format: " + authenticationId);
-            return AllowedStatus.REJECTED;
-        }
-
-        final String authenticationSignature = headers.get("AuthenticationSignature");
-        if (authenticationSignature == null) {
-            LOGGER.warn("External client attempted login without signature!");
-            return AllowedStatus.REJECTED;
-        }
-        final byte[] encryptedSessionHashPayload;
-        try {
-            encryptedSessionHashPayload = Base64.getDecoder().decode(authenticationSignature);
-        } catch (Throwable throwable) {
-            LOGGER.warn("External client attempted to login with a signature which was not decode-able: " + authenticationSignature);
-            return AllowedStatus.REJECTED;
-        }
-
-        final String publicKeyString = headers.get("AuthenticationKey");
-        if (publicKeyString == null) {
-            LOGGER.warn("External client attempted login without public key!");
-            return AllowedStatus.REJECTED;
-        }
-        final String decodedPublicKey;
-        try {
-            decodedPublicKey = new String(Base64.getDecoder().decode(publicKeyString), StandardCharsets.UTF_8);
-        } catch (Throwable throwable) {
-            LOGGER.warn("External client attempted to login with a public key which was not decode-able: " + publicKeyString);
-            return AllowedStatus.REJECTED;
-        }
-        final PublicKey publicKey;
-        try {
-            publicKey = Crypt.stringToRsaPublicKey(decodedPublicKey);
-        } catch (Throwable throwable) {
-            LOGGER.warn("External client attempted to login with a public key which was not in RSA format: " + decodedPublicKey);
-            return AllowedStatus.REJECTED;
-        }
-
-        final String authenticationExpire = headers.get("AuthenticationKeyExpire");
-        if (authenticationExpire == null) {
-            LOGGER.warn("External client attempted login without expire information!");
-            return AllowedStatus.REJECTED;
-        }
-        final String decodedAuthenticationExpire;
-        try {
-            decodedAuthenticationExpire = new String(Base64.getDecoder().decode(authenticationExpire), StandardCharsets.UTF_8);
-        } catch (Throwable throwable) {
-            LOGGER.warn("External client attempted to login with expire information which was not decode-able: " + publicKeyString);
-            return AllowedStatus.REJECTED;
-        }
-        final Instant expire;
-        try {
-            expire = Instant.parse(decodedAuthenticationExpire);
-        } catch (DateTimeParseException e) {
-            LOGGER.warn("External client attempted login without a validly formatted expire information: " + authenticationExpire);
-            return AllowedStatus.REJECTED;
-        }
-
-        final String authenticationKeySignature = headers.get("AuthenticationKeySignature");
-        if (authenticationKeySignature == null) {
-            LOGGER.warn("External client attempted login without a key signature!");
-            return AllowedStatus.REJECTED;
-        }
-        final byte[] keySignature;
-        try {
-            keySignature = Base64.getDecoder().decode(authenticationKeySignature);
-        } catch (Throwable throwable) {
-            LOGGER.warn("External client attempted login with a key signature which was not decode-able: " + authenticationKeySignature);
-            return AllowedStatus.REJECTED;
-        }
-        
-        final String challengeSignatureStr =  headers.get("ChallengeSignature");
-        if(challengeSignatureStr == null) {
-        	LOGGER.warn("External client attempted login without a nonce signature!");
-        	return AllowedStatus.REJECTED;
-        }
-        final byte[] challengeSignature;
-        try{
-        	challengeSignature = Base64.getDecoder().decode(challengeSignatureStr);	
-        } catch (Throwable throwable) {
-            LOGGER.warn("External client attempted login with a nonce signature which was not decode-able: " + challengeSignatureStr);
-            return AllowedStatus.REJECTED;
-        }
-
-        final PublicKeyData keyData = new PublicKeyData(
-                publicKey,
-                expire,
-                keySignature
-        );
-
-        try {
-            validatePublicKey(keyData, sessionId, validator);
-            if (!validateSignedSessionId(sessionId, keyData.validator(), encryptedSessionHashPayload)) {
-                LOGGER.warn("External client attempted login with an invalid signature!");
-                return AllowedStatus.REJECTED;
-            }
-            if(!keyData.validator().validate(challenge, challengeSignature)) {
-            	LOGGER.warn("External client attempted login with an invalid challenge signature!");
-                return AllowedStatus.REJECTED;
-            }
-            AllowedStatus whitelistStatus = WhitelistVerificationHelper.getInstance().isAllowed(sessionId);
-            if(whitelistStatus == AllowedStatus.REJECTED) {
-            	LOGGER.warn("External client attempted login with a session id which is not on the whitelist!");
-            }
-            return whitelistStatus;
-        }
-        catch (Exception e)
-        {
-            LOGGER.warn("External client failed to authenticate.", e);
-            return AllowedStatus.REJECTED;
-        }
-    }
-
     public record PublicKeyData(PublicKey key, Instant expiresAt, byte[] publicKeySignature) {
 
-        boolean verifySessionId(SignatureValidator validator, UUID sessionId) {
-            return validator.validate(this.signedPayload(sessionId), this.publicKeySignature);
+        boolean verifyPlayerId(SignatureValidator validator, UUID playerUUID) {
+            return validator.validate(this.signedPayload(playerUUID), this.publicKeySignature);
         }
 
         public SignatureValidator validator() {
             return SignatureValidator.from(key(), "SHA256withRSA");
         }
 
-        private byte[] signedPayload(UUID sessionId) {
+        private byte[] signedPayload(UUID playerUUID) {
             byte[] keyPayload = this.key.getEncoded();
             byte[] idWithKeyResult = new byte[24 + keyPayload.length];
             ByteBuffer bytebuffer = ByteBuffer.wrap(idWithKeyResult).order(ByteOrder.BIG_ENDIAN);
-            bytebuffer.putLong(sessionId.getMostSignificantBits()).putLong(sessionId.getLeastSignificantBits()).putLong(this.expiresAt.toEpochMilli()).put(keyPayload);
+            bytebuffer.putLong(playerUUID.getMostSignificantBits()).putLong(playerUUID.getLeastSignificantBits()).putLong(this.expiresAt.toEpochMilli()).put(keyPayload);
             return idWithKeyResult;
         }
     }
@@ -375,7 +202,7 @@ public final class ProfileKeyPairBasedSecurityManager
     public record ProfileKeyPair(PrivateKey privateKey, PublicKeyData publicKeyData) {
     }
 
-    private record SigningHandler(ProfileKeyPair keyPair, Signer signer) {
+    public record SigningHandler(ProfileKeyPair keyPair, Signer signer) {
 
         private SigningHandler(ProfileKeyPair keyPair)
         {

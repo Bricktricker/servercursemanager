@@ -27,7 +27,7 @@ import cpw.mods.forge.serverpacklocator.LaunchEnvironmentHandler;
 
 public class ClientSideHandler extends SideHandler {
 
-	private SimpleHttpClient httpClient;
+	private SimpleClient httpClient;
 
 	private String status = "";
 
@@ -71,12 +71,12 @@ public class ClientSideHandler extends SideHandler {
 		super.initialize();
 
 		final Path modpackZip = this.getServerpackFolder().resolve("modpack.zip");
-		String currentModpackHash = "0";
+		byte[] currentModpackHash = null;
 		if(Files.exists(modpackZip) && Files.isRegularFile(modpackZip)) {
 			currentModpackHash = Utils.computeSha1(modpackZip);
 		}
 
-		this.httpClient = new SimpleHttpClient(this, currentModpackHash);
+		this.httpClient = new SimpleClient(this, currentModpackHash);
 
 		boolean downloadSuccessful = false;
 		try {
@@ -117,7 +117,7 @@ public class ClientSideHandler extends SideHandler {
 					String url = mod.getAsJsonPrimitive("url").getAsString();
 					String sha1 = mod.getAsJsonPrimitive("sha1").getAsString();
 					String fileName = mod.getAsJsonPrimitive("file").getAsString();
-					
+
 					CompletableFuture<Void> future = CompletableFuture.supplyAsync(() -> {
 						try {
 							CurseDownloader.downloadFile(url, fileName, sha1, getServermodsFolder());
@@ -126,15 +126,14 @@ public class ClientSideHandler extends SideHandler {
 							LOGGER.catching(e);
 							return null;
 						}
-					}, downloadThreadpool)
-					.thenAcceptAsync(f -> {
+					}, downloadThreadpool).thenAcceptAsync(f -> {
 						if(f != null) {
 							this.loadedModNames.add(f);
 						}
 					}, singleExcecutor);
 
 					futures.add(future);
-					
+
 				}else if("local".equals(source)) {
 					String filename = mod.getAsJsonPrimitive("file").getAsString();
 					ZipEntry modEntry = zf.getEntry("mods/" + filename);
@@ -158,7 +157,7 @@ public class ClientSideHandler extends SideHandler {
 					LOGGER.debug("Skipped writing additional file {}, because it already exists", destination.toString());
 				}
 			}
-			
+
 			this.installTask = CompletableFuture.allOf(futures.toArray(new CompletableFuture[futures.size()]));
 
 		}catch(IOException e) {
