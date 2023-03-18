@@ -1,4 +1,4 @@
 [client]
 # The URL of the minecraft server you wish to fetch mods from. This should be supplied by your server administrator
-remoteServer = "http://localhost:8080/"
+remoteServer = "localhost:4148"
 

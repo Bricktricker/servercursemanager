@@ -1,17 +1,71 @@
 # Server Curse Manager
 A feature extension of [cpw/serverpacklocator](https://github.com/cpw/serverpacklocator/).
+This project allows a MinecraftForge server owner to specify the modpack with a JSON config file and let clients downlaod it during startup. Makes setting up and updating a custom modpack with friends much easier.
 
-## Structure
-### On the server
-On server start the mod locator loads its data from the `serverpack` folder. This folder should contains the a `pack.json` file containing a list of all used mods. The mods are either from curseforge, identifed by the project id and the file id, or a local file identified by its path.  
-If the file is pressent the mods are downloaded into the `servermods` folder.  
-The `pack.json` file has to contain a `mods` array containing all modpack mods. Every entry has to be a JSON object containing a `source` entry, with either `curse` of `local` as a value.  
-If the source is `curse` the mod is fetched from [curseforge.com](https://www.curseforge.com/). There also need to be an `projectID` entry as a Integer with the curseforge mod id and an `fileID` entry as an Integer specifying the curseforge file id.  
-If the source is `local` a local mod file gets included in the modpack. A `mod` entry as aString is needed to specify the file location relative to the server root folder.  
-Additionally a `additional` entry can be present in the `pack.json` containing a list of additional files that should be send to the client. Every entry need to be an object containing a `file` entry as a String specifying the file location relative to the server root location. This can also point to a folder. A `target` entry is also needed specifying the target location of the file or folder relative to the gameDir folder (typically the `.minecraft` folder). If the `file` antry points to a folder the `target` entry needs to end in a `/`.  
-Additionally a `copyOption` entry can be present in the `pack.json` containing a String specifying what sould happen if a file specified as an additional file is allready present. Valid options are `overwrite` to overwrite the existing file and `keep` to keep the existing file. Defaults to `overwrite`.  
-Note that you have to enable the whitelist on the server and add all player that are allowed to download the modpack to the whitelist.
+## Server
+### Install
+Simply put the jar file into the `mods` folder of your MinecraftForge server. Then start the server once to generate the config files and folders.
 
-### On the client
-The client loads its config from the `serverpack` folder. If the configuration is correct, the client downloads their KeyPair from the Mojang servers and connects to the mod-server, its requesting the pack file and including its current hash (or "0") in the http get request. The server either returns the pack, or return the status code 304 (Not modified).  If the client gets a new version ist saves it in the `serverpack` folder as `modpack.zip` and unpacks/installs it.  
-While downloading the mods the cleint creats a lookup table fileid -> orriginal name.  
+### Config
+Server Curse Manager adds two new folders to your MineraftForge server: `serverpack` and `servermods`. `Servermods` is managed by the program and stores all downloaded mods. The `serverpack` folder contains the configuration files for the Server Curse Manager.
+
+After the first start you should have a `pack.json` file in your `serverpack` folder to configer the loaded mods. This JSON file contains 3 main entries:
+
+1. `port`: The port that Server Curse Manager should use to listen for clients that want to download the modpack
+2. `mods`: This is an array that list all mods you want to load on the server and all clients. Every mod is a JSON object with at least 2 values: 
+	1. `source`:  The source of the mod, this can either be `curse` to download the mod from [curseforge.com](https://www.curseforge.com/) or `local` to load a local jar file.
+	2. If the source is `curse`, you need to specify two more entries: `projectID` (The curseforge project ID of the mod) and `fileID` (The file ID of the specific file).
+	3. If the source is `local` you need a `mod` entry specifying  the path to the jar file relative to the MinecraftForge root folder.
+	4. You can also specify aditional entries like the mod name to better organize your config file. Other entries are ignored by Server Curse Manager.
+3. `additional`:  Contains additonal files or folders you want to sync to the client, this can be config files, resource packs or client-only mods. Every file or folder you want to sync is a JSON object with two entries:
+	1. `file`: The path to the file or folder you want to sync, relative to the  MinecraftForge root folder.
+	2. `target`: Where the file or folder should be placed on the client relative to the current game folder (This is either the `.minecraft` folder or the folder specified fo the current profile).
+
+Make sure to restart the server after chainging the config file.
+
+### Example config
+```JSON
+{
+    "port": 4148,
+    "additional": [
+        {
+            "file": "config/",
+            "target": "config/"
+        },
+        {
+            "file": "clientstuff/OurTexturePack.zip",
+            "target": "resourcepacks/texturePack.zip"
+        }
+    ],
+    "mods": [
+        {
+            "name": "Just Enough Items (JEI)",
+            "projectID": 238222,
+            "fileID": 4405393,
+            "source": "curse"
+        },
+        {
+            "name": "The One Probe",
+            "projectID": 245211,
+            "fileID": 4159743,
+            "source": "curse"
+        },
+        {
+            "source": "local",
+            "mod": "serverpack/myMod.jar",
+            "name": "MyMod"
+        }
+    ]
+}
+```
+
+### Authentication
+Server Curse Manager uses the newly added key pairs every Mojang account has to validate the used player UUID that is used to request the modpack. If you only want to allow specific players to download the modpack, you can simply enable the white-list on the server and add all trusted users to it. Server Curse Manager  automatically checks for the enable white-list and only allows players that are on the white-list to download the modpack.
+
+## Client
+### Install
+Simply put the jar file into the `mods` folder. Then start Minecraft once to generate the config file and needed folders. Make sure you have migrated your Mojang account to a Microsoft account.
+
+### Config
+The only important config file is the the `serverpack/config.toml` file.  Here you need to specify the server ip or adress and port of the target MinecraftForge server, right next to the `remoteServer`. You should specify the server in the format `server:port`, e.g. `localhost:8080` or `my.server.com:4148`.
+

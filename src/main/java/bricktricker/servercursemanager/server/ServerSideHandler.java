@@ -2,6 +2,7 @@ package bricktricker.servercursemanager.server;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -28,32 +29,31 @@ import bricktricker.servercursemanager.CopyOption;
 import bricktricker.servercursemanager.CurseDownloader;
 import bricktricker.servercursemanager.SideHandler;
 import bricktricker.servercursemanager.Utils;
+import bricktricker.servercursemanager.client.ClientSideHandler;
 import cpw.mods.forge.serverpacklocator.secure.ProfileKeyPairBasedSecurityManager;
 
 public class ServerSideHandler extends SideHandler {
 
 	private List<ModMapping> modMappings;
+	
+	private JsonObject packConfig;
 
 	public ServerSideHandler(Path gameDir) {
 		super(gameDir);
+		Path packConfigPath = this.serverpackFolder.resolve("pack.json");
+		if(!Files.exists(packConfigPath) || !Files.isRegularFile(packConfigPath)) {
+			try {
+				Files.copy(ClientSideHandler.class.getResourceAsStream(this.getConfigFile()), packConfigPath);
+			}catch(IOException e) {
+				throw new UncheckedIOException(e);
+			}
+		}
+		this.packConfig = Utils.loadJson(packConfigPath).getAsJsonObject();
 	}
 
 	@Override
 	protected String getConfigFile() {
-		return "/defaultserverconfig.toml";
-	}
-
-	@Override
-	protected void validateConfig() {
-		final int port = this.packConfig.get("server.port");
-		final String packFile = this.packConfig.get("server.packfile");
-
-		LOGGER.debug("Configuration: port {}, packFile {}", port, packFile);
-
-		if(packFile.isBlank() || port <= 0) {
-			LOGGER.fatal("Invalid configuration for Server Curse Manager found: {}, please delete or correct before trying again", this.packConfig.getNioPath());
-			throw new IllegalStateException("Invalid Configuration");
-		}
+		return "/defaultserverconfig.json";
 	}
 
 	/**
@@ -61,7 +61,23 @@ public class ServerSideHandler extends SideHandler {
 	 */
 	@Override
 	public boolean isValid() {
-		return Files.exists(this.getServerpackFolder().resolve(this.packConfig.<String>get("server.packfile")));
+		if(!this.packConfig.has("port")) {
+			LOGGER.fatal("Invalid configuration for Server Curse Manager found: 'port' not specified in the config file");
+			return false;
+		}
+		int port = this.packConfig.getAsJsonPrimitive("port").getAsInt();
+		if(port <= 0 || port > 65535) {
+			LOGGER.fatal("Invalid configuration for Server Curse Manager found: 'port' must be a valid port number, currently {}", port);
+			return false;
+		}
+		
+		if(!packConfig.has(SideHandler.MODS) || !packConfig.get(SideHandler.MODS).isJsonArray()) {
+			LOGGER.fatal("pack configuration for Server Curse Manager is missing mods list");
+			return false;
+		}
+
+		LOGGER.debug("Configuration: port {}, num mods: {}", port, packConfig.getAsJsonArray(SideHandler.MODS).size());
+		return true;
 	}
 
 	protected void loadMappings() {
@@ -146,14 +162,6 @@ public class ServerSideHandler extends SideHandler {
 		super.initialize();
 
 		this.loadMappings();
-
-		// load modpack config
-		JsonObject packConfig = Utils.loadJson(getServerpackFolder().resolve(this.packConfig.<String>get("server.packfile"))).getAsJsonObject();
-
-		if(!packConfig.has(SideHandler.MODS) || !packConfig.get(SideHandler.MODS).isJsonArray()) {
-			LOGGER.error("pack configuration for Server Curse Manager is missing mods list");
-			throw new IllegalArgumentException("mods not specified in modpack configuration");
-		}
 
 		int numDownloadThreads = Math.max(Runtime.getRuntime().availableProcessors() / 2, 1);
 		this.downloadThreadpool = new ThreadPoolExecutor(1, numDownloadThreads, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<Runnable>());
@@ -357,7 +365,7 @@ public class ServerSideHandler extends SideHandler {
 	}
 
 	public int getPort() {
-		return this.packConfig.get("server.port");
+		return this.packConfig.getAsJsonPrimitive("port").getAsInt();
 	}
 
 	public static record ModMapping(int projectID, int fileID, String fileName, String downloadUrl, String sha1) {

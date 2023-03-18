@@ -11,17 +11,11 @@ import java.util.concurrent.TimeUnit;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import com.electronwill.nightconfig.core.file.CommentedFileConfig;
-import com.electronwill.nightconfig.core.file.FileConfig;
-import com.electronwill.nightconfig.core.file.FileNotFoundAction;
-
 public abstract class SideHandler {
 
 	protected static final Logger LOGGER = LogManager.getLogger();
 	protected static final String ADDITIONAL = "additional";
 	protected static final String MODS = "mods";
-
-	protected final FileConfig packConfig;
 
 	protected final Path serverModsPath;
 	protected Path serverpackFolder;
@@ -35,16 +29,6 @@ public abstract class SideHandler {
 	protected SideHandler(Path gameDir) {
 		this.serverpackFolder = Utils.createOrGetDirectory(gameDir, "serverpack");
 		this.serverModsPath = Utils.createOrGetDirectory(gameDir, "servermods");
-
-		this.packConfig = CommentedFileConfig.builder(serverpackFolder.resolve("config.toml"))
-				.preserveInsertionOrder()
-				.onFileNotFound(FileNotFoundAction.copyData(SideHandler.class.getResourceAsStream(this.getConfigFile())))
-				.build();
-
-		this.packConfig.load();
-		this.packConfig.close();
-
-		this.validateConfig();
 	}
 
 	public void doCleanup() {
@@ -83,8 +67,6 @@ public abstract class SideHandler {
 	public abstract boolean isValid();
 
 	protected abstract String getConfigFile();
-
-	protected abstract void validateConfig();
 
 	public String getStatus() {
 		return "";

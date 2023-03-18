@@ -15,6 +15,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
+import com.electronwill.nightconfig.core.file.CommentedFileConfig;
+import com.electronwill.nightconfig.core.file.FileConfig;
+import com.electronwill.nightconfig.core.file.FileNotFoundAction;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -30,10 +33,20 @@ public class ClientSideHandler extends SideHandler {
 	private SimpleClient httpClient;
 
 	private String status = "";
+	
+	protected final FileConfig packConfig;
 
 	public ClientSideHandler(Path gameDir) {
 		super(gameDir);
 		this.status = "Not set up";
+		
+		this.packConfig = CommentedFileConfig.builder(serverpackFolder.resolve("config.toml"))
+				.preserveInsertionOrder()
+				.onFileNotFound(FileNotFoundAction.copyData(ClientSideHandler.class.getResourceAsStream(this.getConfigFile())))
+				.build();
+
+		this.packConfig.load();
+		this.packConfig.close();
 	}
 
 	@Override
@@ -43,17 +56,12 @@ public class ClientSideHandler extends SideHandler {
 
 	@Override
 	public boolean isValid() {
-		return true;
-	}
-
-	@Override
-	protected void validateConfig() {
 		final String uuid = LaunchEnvironmentHandler.INSTANCE.getUUID();
 		if(uuid == null || uuid.length() == 0) {
 			// invalid UUID - probably offline mode. not supported
 			LaunchEnvironmentHandler.INSTANCE.addProgressMessage("NO UUID found. Offline mode does not work. No server mods will be downloaded");
 			LOGGER.error("There was not a valid UUID present in this client launch. You are probably playing offline mode. Trivially, there is nothing for us to do.");
-			throw new IllegalStateException("Offline play not supported");
+			return false;
 		}
 
 		final String remoteServer = this.packConfig.get("client.remoteServer");
@@ -62,8 +70,9 @@ public class ClientSideHandler extends SideHandler {
 
 		if(remoteServer.isBlank()) {
 			LOGGER.fatal("Invalid configuration for Server Curse Manager found: {}, please delete or correct before trying again", this.packConfig.getNioPath());
-			throw new IllegalStateException("Invalid Configuration");
+			return false;
 		}
+		return true;
 	}
 
 	@Override

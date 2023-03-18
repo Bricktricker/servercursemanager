@@ -1,6 +1,0 @@
-[server]
-# Enter a port to listen on. This will be serving public HTTP requests.
-port = 8080
-# The file in the 'serverpack' folder that specifies the loaded mods
-packfile = "pack.json"
-
