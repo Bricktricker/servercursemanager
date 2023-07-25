@@ -15,11 +15,12 @@ After the first start you should have a `pack.json` file in your `serverpack` fo
 2. `mods`: This is an array that list all mods you want to load on the server and all clients. Every mod is a JSON object with at least 2 values: 
 	1. `source`:  The source of the mod, this can either be `curse` to download the mod from [curseforge.com](https://www.curseforge.com/) or `local` to load a local jar file.
 	2. If the source is `curse`, you need to specify two more entries: `projectID` (The curseforge project ID of the mod) and `fileID` (The file ID of the specific file).
-	3. If the source is `local` you need a `mod` entry specifying  the path to the jar file relative to the MinecraftForge root folder.
+	3. If the source is `local` you need a `mod` entry specifying  the path to the jar file relative to the MinecraftForge server root folder.
 	4. You can also specify aditional entries like the mod name to better organize your config file. Other entries are ignored by Server Curse Manager.
 3. `additional`:  Contains additonal files or folders you want to sync to the client, this can be config files, resource packs or client-only mods. Every file or folder you want to sync is a JSON object with two entries:
 	1. `file`: The path to the file or folder you want to sync, relative to the  MinecraftForge root folder.
 	2. `target`: Where the file or folder should be placed on the client relative to the current game folder (This is either the `.minecraft` folder or the folder specified fo the current profile).
+4. `copyOption`: Can either be `overwrite` or `keep`, defaults to `overwrite`. This specifies how to deal with additional files, if they are already present on the client. You can also specify this for individual files.
 
 Make sure to restart the server after chainging the config file.
 
@@ -34,7 +35,8 @@ Make sure to restart the server after chainging the config file.
         },
         {
             "file": "clientstuff/OurTexturePack.zip",
-            "target": "resourcepacks/texturePack.zip"
+            "target": "resourcepacks/texturePack.zip",
+            "copyOption": "keep"
         }
     ],
     "mods": [

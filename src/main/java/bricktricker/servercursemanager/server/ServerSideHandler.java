@@ -19,7 +19,7 @@ import java.util.stream.StreamSupport;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
-import org.apache.commons.lang3.tuple.Pair;
+import org.apache.logging.log4j.util.TriConsumer;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -263,13 +263,44 @@ public class ServerSideHandler extends SideHandler {
 		JsonArray manifestAdditional = new JsonArray();
 		// gather aditional files
 		if(packConfig.has(SideHandler.ADDITIONAL)) {
-			List<Pair<Path, String>> filesToCopy = new ArrayList<>();
+			
+			// Keep track of added additional files, add util-lambda to run file copy on the singleExcecutor
+			List<String> filesToCopy = new ArrayList<>();
+			TriConsumer<Path, String, CopyOption> fileAdder = (p, targetStr, copyOption) -> {
+				boolean alreadyPresent = filesToCopy.stream().anyMatch(x -> x.equals(targetStr));
+				if(alreadyPresent) {
+					return;
+				}
+				
+				filesToCopy.add(targetStr);
+				CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
+					String pathInZip = SideHandler.ADDITIONAL + "/" + targetStr;
+					LOGGER.debug("Adding additional file {} as target {}, stored as {} to modpack", p.toString(), targetStr, pathInZip);
+					ZipEntry entry = Utils.getStableEntry(pathInZip);
+					try {
+						zos.putNextEntry(entry);
+						Files.copy(p, zos);
+						zos.closeEntry();
+						
+						JsonObject additionalObj = new JsonObject();
+						additionalObj.addProperty("file", targetStr);
+						additionalObj.addProperty("copyOption", copyOption.configName());
+						
+						manifestAdditional.add(additionalObj);
+					}catch(IOException e) {
+						LOGGER.catching(e);
+					}
+				}, singleExcecutor);
+				futures.add(future);
+			}; 
+			
 			JsonArray additional = packConfig.getAsJsonArray(SideHandler.ADDITIONAL);
 			for(JsonElement fileE : additional) {
 				JsonObject additionalFile = fileE.getAsJsonObject();
 
 				String file = additionalFile.getAsJsonPrimitive("file").getAsString();
 				String target = additionalFile.getAsJsonPrimitive("target").getAsString();
+				CopyOption copyOption = additionalFile.has("copyOption") ? CopyOption.getOption(additionalFile.getAsJsonPrimitive("copyOption").getAsString()) : CopyOption.OVERWRITE;
 
 				Path filePath = Paths.get(file);
 				boolean isFile = Files.isRegularFile(filePath);
@@ -299,49 +330,25 @@ public class ServerSideHandler extends SideHandler {
 
 							String targetStr = s.toString();
 
-							boolean alreadyPresent = filesToCopy.stream().map(Pair::getRight).anyMatch(x -> x.equals(targetStr));
-
-							if(!alreadyPresent) {
-								filesToCopy.add(Pair.of(p, targetStr));
-							}
+							fileAdder.accept(p, targetStr, copyOption);
 						});
 					}catch(IOException e) {
 						LOGGER.catching(e);
 					}
 
 				}else {
-					filesToCopy.add(Pair.of(filePath, target));
+					fileAdder.accept(filePath, target, copyOption);
 				}
 			}
-
-			CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
-				for(Pair<Path, String> p : filesToCopy) {
-					String pathInZip = SideHandler.ADDITIONAL + "/" + p.getRight();
-					LOGGER.debug("Adding additional file {} as target {}, stored as {} to modpack", p.getLeft().toString(), p.getRight(), pathInZip);
-					ZipEntry entry = Utils.getStableEntry(pathInZip);
-					try {
-						zos.putNextEntry(entry);
-						Files.copy(p.getLeft(), zos);
-						zos.closeEntry();
-						manifestAdditional.add(p.getRight());
-					}catch(IOException e) {
-						LOGGER.catching(e);
-					}
-				}
-			}, singleExcecutor);
-
-			futures.add(future);
 		}
 
-		CompletableFuture<Void> downloadTask = CompletableFuture.allOf(futures.toArray(new CompletableFuture[futures.size()]));
+		CompletableFuture<Void> downloadTask = CompletableFuture.allOf(futures.toArray(CompletableFuture[]::new));
 		this.installTask = downloadTask.thenRunAsync(() -> {
 
 			// create modpack zip
 			JsonObject manifest = new JsonObject();
 			manifest.add(SideHandler.MODS, manifestMods);
 			manifest.add(SideHandler.ADDITIONAL, manifestAdditional);
-			CopyOption copyOption = packConfig.has("copyOption") ? CopyOption.getOption(packConfig.getAsJsonPrimitive("copyOption").getAsString()) : CopyOption.OVERWRITE;
-			manifest.addProperty("copyOption", copyOption.configName());
 
 			try {
 				ZipEntry manifestEntry = Utils.getStableEntry("manifest.json");

@@ -109,8 +109,6 @@ public class ClientSideHandler extends SideHandler {
 			return;
 		}
 
-		int numDownloadThreads = Math.max(Runtime.getRuntime().availableProcessors() / 2, 1);
-		this.downloadThreadpool = new ThreadPoolExecutor(1, numDownloadThreads, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<Runnable>());
 		this.singleExcecutor = Executors.newSingleThreadExecutor();
 		final List<CompletableFuture<Void>> futures = new ArrayList<>();
 
@@ -119,6 +117,9 @@ public class ClientSideHandler extends SideHandler {
 			JsonObject manifest = Utils.loadJson(zf.getInputStream(manifestEntry)).getAsJsonObject();
 
 			JsonArray mods = manifest.getAsJsonArray(SideHandler.MODS);
+			int numDownloadThreads = Math.min(Math.max(Runtime.getRuntime().availableProcessors() / 2, 1), mods.size());
+			this.downloadThreadpool = new ThreadPoolExecutor(1, numDownloadThreads, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<Runnable>());
+			
 			for(JsonElement modE : mods) {
 				JsonObject mod = modE.getAsJsonObject();
 				final String source = mod.getAsJsonPrimitive("source").getAsString();
@@ -152,10 +153,10 @@ public class ClientSideHandler extends SideHandler {
 				}
 			}
 
-			CopyOption copyOption = CopyOption.getOption(manifest.getAsJsonPrimitive("copyOption").getAsString());
 			JsonArray additional = manifest.getAsJsonArray(SideHandler.ADDITIONAL);
 			for(JsonElement fileE : additional) {
-				String file = fileE.getAsJsonPrimitive().getAsString();
+				String file = fileE.getAsJsonObject().getAsJsonPrimitive("file").getAsString();
+				CopyOption copyOption = CopyOption.getOption(fileE.getAsJsonObject().getAsJsonPrimitive("copyOption").getAsString());
 				ZipEntry fileEntry = zf.getEntry(SideHandler.ADDITIONAL + "/" + file);
 				Path destination = LaunchEnvironmentHandler.INSTANCE.getGameDir().resolve(file);
 				Files.createDirectories(destination.getParent());
@@ -163,11 +164,11 @@ public class ClientSideHandler extends SideHandler {
 					Files.copy(zf.getInputStream(fileEntry), destination, StandardCopyOption.REPLACE_EXISTING);
 					LOGGER.debug("Copied additional file to {}", destination.toString());
 				}else {
-					LOGGER.debug("Skipped writing additional file {}, because it already exists", destination.toString());
+					LOGGER.debug("Skipped writing additional file {}", destination.toString());
 				}
 			}
 
-			this.installTask = CompletableFuture.allOf(futures.toArray(new CompletableFuture[futures.size()]));
+			this.installTask = CompletableFuture.allOf(futures.toArray(CompletableFuture[]::new));
 
 		}catch(IOException e) {
 			LOGGER.catching(e);
