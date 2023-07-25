@@ -7,10 +7,12 @@ import java.util.function.Predicate;
 
 public enum CopyOption {
 	OVERWRITE("overwrite", path -> {
-		return true;
+		// Only overwrite file, if there is not 'path.bak' file present
+		String bak = path.toString() + ".bak";
+		return !Files.exists(Path.of(bak));
 	}),
 	KEEP("keep", path -> {
-		return !Files.exists(path);
+		return !Files.exists(path) && OVERWRITE.writeFile(path);
 	});
 
 	private final String configName;

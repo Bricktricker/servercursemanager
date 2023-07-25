@@ -68,4 +68,5 @@ Simply put the jar file into the `mods` folder. Then start Minecraft once to gen
 
 ### Config
 The only important config file is the the `serverpack/config.toml` file.  Here you need to specify the server ip or adress and port of the target MinecraftForge server, right next to the `remoteServer`. You should specify the server in the format `server:port`, e.g. `localhost:8080` or `my.server.com:4148`.
+The server alllows overwriting and creating additional files on the client. If you, as the client, don't want a specific file to be created, create an empty file at the same place with the same name, but with an .bak extension. This tells the SCM to skip creating or updating the file.
 
