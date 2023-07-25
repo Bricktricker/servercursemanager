@@ -2,7 +2,7 @@ package cpw.mods.forge.serverpacklocator.secure;
 
 import com.mojang.authlib.exceptions.AuthenticationException;
 import com.mojang.authlib.minecraft.UserApiService;
-import com.mojang.authlib.yggdrasil.ServicesKeyInfo;
+import com.mojang.authlib.yggdrasil.ServicesKeySet;
 import com.mojang.authlib.yggdrasil.YggdrasilAuthenticationService;
 import com.mojang.authlib.yggdrasil.response.KeyPairResponse;
 
@@ -159,7 +159,7 @@ public final class ProfileKeyPairBasedSecurityManager
     private static SignatureValidator fetchMojangValidator() {
         final YggdrasilAuthenticationService authenticationService = getAuthenticationService();
 
-        final ServicesKeyInfo keyInfo = authenticationService.getServicesKey();
+        final ServicesKeySet keyInfo = authenticationService.getServicesKeySet();
         if (keyInfo == null)
             return SignatureValidator.ALWAYS_FAIL;
 

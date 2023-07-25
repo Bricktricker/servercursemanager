@@ -58,11 +58,11 @@ task distributionJar(type: Jar) {
 
 dependencies {
     implementation('cpw.mods:modlauncher:10.0.8')
-    implementation('net.minecraftforge:forgespi:6.0.0')
+    implementation('net.minecraftforge:forgespi:7.0.0')
     implementation('com.electronwill.night-config:core:3.6.4')
     implementation('com.electronwill.night-config:toml:3.6.4')
     implementation('com.google.code.gson:gson:2.10')
-    implementation("com.mojang:authlib:3.16.29")
+    implementation("com.mojang:authlib:4.0.43")
 
     implementation('io.netty:netty-common:4.1.82.Final')
     implementation('io.netty:netty-buffer:4.1.82.Final')

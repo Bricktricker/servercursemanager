@@ -1,6 +1,9 @@
 package cpw.mods.forge.serverpacklocator.secure;
 
 import com.mojang.authlib.yggdrasil.ServicesKeyInfo;
+import com.mojang.authlib.yggdrasil.ServicesKeySet;
+import com.mojang.authlib.yggdrasil.ServicesKeyType;
+
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -9,6 +12,7 @@ import java.security.NoSuchAlgorithmException;
 import java.security.PublicKey;
 import java.security.Signature;
 import java.security.SignatureException;
+import java.util.Collection;
 
 /**
  * Copied from https://github.com/cpw/serverpacklocator/blob/4496cf9ba45515b286bde1a3a79513e75b69754e/src/main/java/cpw/mods/forge/serverpacklocator/secure/SignatureValidator.java
@@ -41,16 +45,22 @@ public interface SignatureValidator {
         };
     }
 
-    static SignatureValidator from(ServicesKeyInfo servicesKeyInfo) {
-        return (payload, inputSignature) -> {
-            Signature signature = servicesKeyInfo.signature();
-
-            try {
-                return verifySignature(payload, inputSignature, signature);
-            } catch (SignatureException signatureexception) {
-                LOGGER.error("Failed to verify Services signature", signatureexception);
-                return false;
-            }
-        };
+    static SignatureValidator from(ServicesKeySet servicesKeySet) {
+    	Collection<ServicesKeyInfo> servicesKeyInfos = servicesKeySet.keys(ServicesKeyType.PROFILE_KEY);
+    	if(servicesKeyInfos == null || servicesKeyInfos.isEmpty()) {
+    		throw new IllegalStateException("Could not get keys for ServicesKeyType.PROFILE_KEY");
+    	}
+    	
+    	return (payload, inputSignature) -> {
+    		return servicesKeyInfos.stream().anyMatch(servicesKeyInfo -> {
+    			Signature signature = servicesKeyInfo.signature();
+                try {
+                    return verifySignature(payload, inputSignature, signature);
+                } catch (SignatureException signatureexception) {
+                    LOGGER.error("Failed to verify Services signature", signatureexception);
+                    return false;
+                }
+    		});
+    	};
     }
 }
