@@ -20,6 +20,7 @@ import cpw.mods.forge.serverpacklocator.secure.WhitelistVerificationHelper;
 import cpw.mods.forge.serverpacklocator.secure.ProfileKeyPairBasedSecurityManager.PublicKeyData;
 import cpw.mods.forge.serverpacklocator.secure.WhitelistVerificationHelper.AllowedStatus;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufUtil;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
@@ -141,6 +142,7 @@ public class ServerChannel extends ChannelInboundHandlerAdapter {
 		}
 
 		byte[] currentPackHash = readBuffer(packet, 32);
+		LOGGER.debug("Client send hash: {}, server modpack hash: {}", ByteBufUtil.hexDump(currentPackHash), ByteBufUtil.hexDump(this.modpackHash));
 		boolean hashesEqual = Arrays.equals(currentPackHash, this.modpackHash);
 
 		// Send modpack back

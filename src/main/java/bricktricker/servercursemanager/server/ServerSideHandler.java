@@ -8,10 +8,10 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -162,11 +162,14 @@ public class ServerSideHandler extends SideHandler {
 		super.initialize();
 
 		this.loadMappings();
+		
+		CopyOption globalCopyOption = CopyOption.KEEP;
+		if(packConfig.has("copyOption")) {
+			globalCopyOption = CopyOption.getOption(packConfig.getAsJsonPrimitive("copyOption").getAsString());
+		}
 
 		int numDownloadThreads = Math.max(Runtime.getRuntime().availableProcessors() / 2, 1);
 		this.downloadThreadpool = new ThreadPoolExecutor(1, numDownloadThreads, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<Runnable>());
-		this.singleExcecutor = Executors.newSingleThreadExecutor();
-		final List<CompletableFuture<Void>> futures = new ArrayList<>();
 
 		ByteArrayOutputStream baos = new ByteArrayOutputStream();
 		ZipOutputStream zos = new ZipOutputStream(baos);
@@ -175,6 +178,9 @@ public class ServerSideHandler extends SideHandler {
 		// modpack zip
 		final JsonArray manifestMods = new JsonArray();
 
+		// we download the mods asynchronously, so we save the futures here
+		final List<CompletableFuture<ModMapping>> modMappingFutures = new ArrayList<>();
+		
 		JsonArray mods = packConfig.getAsJsonArray(SideHandler.MODS);
 		for(JsonElement modE : mods) {
 			final JsonObject mod = modE.getAsJsonObject();
@@ -183,9 +189,10 @@ public class ServerSideHandler extends SideHandler {
 			if("curse".equalsIgnoreCase(source)) {
 				int projectID = mod.getAsJsonPrimitive("projectID").getAsInt();
 				int fileID = mod.getAsJsonPrimitive("fileID").getAsInt();
-
-				CompletableFuture<Void> future = CompletableFuture.supplyAsync(() -> {
-					ModMapping mapping = this.getMapping(projectID, fileID).orElseGet(() -> {
+				
+				var future = this.getMapping(projectID, fileID)
+					.map(CompletableFuture::completedFuture)
+					.orElseGet(() -> CompletableFuture.supplyAsync(() -> {
 						try {
 							LOGGER.debug("Downloading curse file {} for project {}", fileID, projectID);
 							ModMapping m = CurseDownloader.downloadMod(projectID, fileID, getServermodsFolder());
@@ -195,103 +202,94 @@ public class ServerSideHandler extends SideHandler {
 							LOGGER.catching(e);
 							return null;
 						}
-					});
-
-					return mapping;
-				}, downloadThreadpool).thenAcceptAsync(mapping -> {
-					if(mapping != null) {
-						var manifestMod = new JsonObject();
-						manifestMod.addProperty("source", "remote");
-						manifestMod.addProperty("url", mapping.downloadUrl());
-						manifestMod.addProperty("file", mapping.fileName());
-						manifestMod.addProperty("sha1", mapping.sha1());
-						manifestMods.add(manifestMod);
-
-						this.loadedModNames.add(mapping.fileName());
-					}
-				}, singleExcecutor);
-
-				futures.add(future);
-
-			}else if("local".equalsIgnoreCase(source)) {
+					}, downloadThreadpool));
+				
+				modMappingFutures.add(future);
+			}else if("local".equals(source)) {
 				String modPath = mod.getAsJsonPrimitive("mod").getAsString();
 				Path sourcePath = Paths.get(modPath);
 				String modName = sourcePath.getFileName().toString();
-
-				CompletableFuture<Void> future = CompletableFuture.supplyAsync(() -> {
-					if(!Files.isRegularFile(sourcePath) || !Files.exists(sourcePath)) {
-						LOGGER.error("mod path {} does not point to a file", modPath);
-						return null;
-					}
-					try {
-						Files.copy(sourcePath, getServermodsFolder().resolve(modName), StandardCopyOption.REPLACE_EXISTING);
-					}catch(IOException e) {
-						LOGGER.catching(e);
-						return null;
-					}
-
-					JsonObject modManifest = new JsonObject();
-					modManifest.addProperty("source", source);
-					modManifest.addProperty("file", modName);
-
-					return modManifest;
-				}, downloadThreadpool).thenAcceptAsync(modManifest -> {
-					if(modManifest != null) {
-						ZipEntry entry = Utils.getStableEntry("mods/" + modName);
-						try {
-							zos.putNextEntry(entry);
-							Files.copy(sourcePath, zos);
-							zos.closeEntry();
-						}catch(IOException e) {
-							LOGGER.catching(e);
-							return;
-						}
-
-						manifestMods.add(modManifest);
-						this.loadedModNames.add(modName);
-					}
-				}, singleExcecutor);
-
-				futures.add(future);
-
-			}else {
-				LOGGER.error("Unkown source {} for a mod", source);
-				continue;
-			}
-		}
-
-		JsonArray manifestAdditional = new JsonArray();
-		// gather aditional files
-		if(packConfig.has(SideHandler.ADDITIONAL)) {
-			
-			// Keep track of added additional files, add util-lambda to run file copy on the singleExcecutor
-			List<String> filesToCopy = new ArrayList<>();
-			TriConsumer<Path, String, CopyOption> fileAdder = (p, targetStr, copyOption) -> {
-				boolean alreadyPresent = filesToCopy.stream().anyMatch(x -> x.equals(targetStr));
-				if(alreadyPresent) {
-					return;
+				
+				if(!Files.isRegularFile(sourcePath) || !Files.exists(sourcePath)) {
+					LOGGER.error("mod path {} does not point to a file", modPath);
+					continue;
 				}
 				
+				// Copy local mods to the servermods folder
+				try {
+					Files.copy(sourcePath, getServermodsFolder().resolve(modName), StandardCopyOption.REPLACE_EXISTING);
+				}catch(IOException e) {
+					LOGGER.catching(e);
+					continue;
+				}
+				
+				JsonObject manifestMod = new JsonObject();
+				manifestMod.addProperty("source", source);
+				manifestMod.addProperty("file", modName);
+
+				// Copy local mods to modpack.zip
+				ZipEntry entry = Utils.getStableEntry("mods/" + modName);
+				try {
+					zos.putNextEntry(entry);
+					Files.copy(sourcePath, zos);
+					zos.closeEntry();
+				}catch(IOException e) {
+					LOGGER.catching(e);
+					continue;
+				}
+				
+				manifestMods.add(manifestMod);
+				this.loadedModNames.add(modName);
+			}else {
+				LOGGER.error("Unkown source {} for a mod", source);
+			}
+		}
+		
+		// get all downloaded mods, add the to the 'manifestMods' list
+		for(var future : modMappingFutures) {
+			ModMapping mapping = future.join();
+			if(mapping == null) {
+				continue;
+			}
+
+			var manifestMod = new JsonObject();
+			manifestMod.addProperty("source", "remote");
+			manifestMod.addProperty("url", mapping.downloadUrl());
+			manifestMod.addProperty("file", mapping.fileName());
+			manifestMod.addProperty("sha1", mapping.sha1());
+			manifestMods.add(manifestMod);
+			this.loadedModNames.add(mapping.fileName());
+		}
+
+		// gather aditional files
+		JsonArray manifestAdditional = new JsonArray();
+		if(packConfig.has(SideHandler.ADDITIONAL)) {
+			
+			// Keep track of added additional files
+			HashSet<String> filesToCopy = new HashSet<>();
+			TriConsumer<Path, String, CopyOption> fileAdder = (p, targetStr, copyOption) -> {
+				// Check if we have already added this file
+				if(filesToCopy.contains(targetStr)) {
+					return;
+				}
 				filesToCopy.add(targetStr);
-				CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
-					String pathInZip = SideHandler.ADDITIONAL + "/" + targetStr;
-					LOGGER.debug("Adding additional file {} as target {}, stored as {} to modpack", p.toString(), targetStr, pathInZip);
-					ZipEntry entry = Utils.getStableEntry(pathInZip);
-					try {
-						zos.putNextEntry(entry);
-						Files.copy(p, zos);
-						zos.closeEntry();
-						
-						JsonObject additionalObj = new JsonObject();
-						additionalObj.addProperty("file", targetStr);
-						additionalObj.addProperty("copyOption", copyOption.configName());
-						
-						manifestAdditional.add(additionalObj);
-					}catch(IOException e) {
-						LOGGER.catching(e);
-					}
-				}, singleExcecutor);
-				futures.add(future);
+				
+				String pathInZip = SideHandler.ADDITIONAL + "/" + targetStr;
+				LOGGER.debug("Adding additional file {} as target {}, stored as {} to modpack", p.toString(), targetStr, pathInZip);
+				ZipEntry entry = Utils.getStableEntry(pathInZip);
+				try {
+					zos.putNextEntry(entry);
+					Files.copy(p, zos);
+					zos.closeEntry();
+					
+					JsonObject additionalObj = new JsonObject();
+					additionalObj.addProperty("file", targetStr);
+					additionalObj.addProperty("copyOption", copyOption.configName());
+					
+					manifestAdditional.add(additionalObj);
+				}catch(IOException e) {
+					LOGGER.catching(e);
+				}
 			}; 
 			
 			JsonArray additional = packConfig.getAsJsonArray(SideHandler.ADDITIONAL);
@@ -300,7 +298,7 @@ public class ServerSideHandler extends SideHandler {
 
 				String file = additionalFile.getAsJsonPrimitive("file").getAsString();
 				String target = additionalFile.getAsJsonPrimitive("target").getAsString();
-				CopyOption copyOption = additionalFile.has("copyOption") ? CopyOption.getOption(additionalFile.getAsJsonPrimitive("copyOption").getAsString()) : CopyOption.OVERWRITE;
+				CopyOption copyOption = additionalFile.has("copyOption") ? CopyOption.getOption(additionalFile.getAsJsonPrimitive("copyOption").getAsString()) : globalCopyOption;
 
 				Path filePath = Paths.get(file);
 				boolean isFile = Files.isRegularFile(filePath);
@@ -309,29 +307,34 @@ public class ServerSideHandler extends SideHandler {
 					continue;
 				}
 
+				// Check if it is a file or folder
 				if(!isFile) {
+					// we have a folder
 					if(!target.endsWith("/")) {
 						LOGGER.error("{} points to a folder but {} is not. 'target' has to end in a '/'", file, target);
 						continue;
 					}
 
 					try {
-						Files.walk(filePath).filter(p -> Files.isRegularFile(p)).forEach(p -> {
-							Path relPath = filePath.relativize(p);
-							Path relTarget = Paths.get(target).resolve(relPath).normalize();
-
-							// Custom build target string, to use '/' seperator
-							StringBuilder s = new StringBuilder();
-							for(Path folder : relTarget.getParent()) {
-								s.append(folder.toString());
-								s.append("/");
-							}
-							s.append(relTarget.getFileName());
-
-							String targetStr = s.toString();
-
-							fileAdder.accept(p, targetStr, copyOption);
-						});
+						Files.walk(filePath)
+							.filter(Files::isRegularFile)
+							.sorted() // Sort the files, so its stable across restarts
+							.forEach(p -> {
+								Path relPath = filePath.relativize(p);
+								Path relTarget = Paths.get(target).resolve(relPath).normalize();
+	
+								// Custom build target string, to use '/' seperator
+								StringBuilder s = new StringBuilder();
+								for(Path folder : relTarget.getParent()) {
+									s.append(folder.toString());
+									s.append("/");
+								}
+								s.append(relTarget.getFileName());
+	
+								String targetStr = s.toString();
+								
+								fileAdder.accept(p, targetStr, copyOption);
+							});
 					}catch(IOException e) {
 						LOGGER.catching(e);
 					}
@@ -341,31 +344,27 @@ public class ServerSideHandler extends SideHandler {
 				}
 			}
 		}
+		
+		// create modpack zip
+		JsonObject manifest = new JsonObject();
+		manifest.add(SideHandler.MODS, manifestMods);
+		manifest.add(SideHandler.ADDITIONAL, manifestAdditional);
 
-		CompletableFuture<Void> downloadTask = CompletableFuture.allOf(futures.toArray(CompletableFuture[]::new));
-		this.installTask = downloadTask.thenRunAsync(() -> {
+		try {
+			ZipEntry manifestEntry = Utils.getStableEntry("manifest.json");
+			zos.putNextEntry(manifestEntry);
+			Utils.saveJson(manifest, zos);
+			zos.closeEntry();
+			zos.close(); // Close pack zip
+		}catch(IOException e) {
+			LOGGER.catching(e);
+			return;
+		}
 
-			// create modpack zip
-			JsonObject manifest = new JsonObject();
-			manifest.add(SideHandler.MODS, manifestMods);
-			manifest.add(SideHandler.ADDITIONAL, manifestAdditional);
+		byte[] packData = baos.toByteArray();
+		LOGGER.debug("Generated modpack {} bytes big", packData.length);
 
-			try {
-				ZipEntry manifestEntry = Utils.getStableEntry("manifest.json");
-				zos.putNextEntry(manifestEntry);
-				Utils.saveJson(manifest, zos);
-				zos.closeEntry();
-				zos.close(); // Close pack zip
-			}catch(IOException e) {
-				LOGGER.catching(e);
-				return;
-			}
-
-			byte[] packData = baos.toByteArray();
-
-			RequestServer.run(this, packData);
-
-		}, r -> r.run());
+		RequestServer.run(this, packData);
 
 		// Initialize ProfileKeyPairBasedSecurityManager
 		ProfileKeyPairBasedSecurityManager.getInstance();
