@@ -59,7 +59,7 @@ public class SimpleClient {
 
 					@Override
 					protected void initChannel(final SocketChannel ch) {
-						ch.pipeline().addLast("filter", new PacketFilter(20 * 1024 * 1024)); // Max packet size is 20MiB
+						ch.pipeline().addLast("filter", new PacketFilter(Integer.MAX_VALUE)); // No packet size limit on the client
 						ch.pipeline().addLast("requestHandler", requestHandler);
 					}
 				}).connect();

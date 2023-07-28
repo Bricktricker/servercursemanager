@@ -54,7 +54,9 @@ public class PacketFilter extends ReplayingDecoder<State> {
 			return;
 		}
 		ByteBuf packet = in.readBytes(packetLength);
-		LOGGER.debug("Received packet with length {} and content {}", packetLength, ByteBufUtil.hexDump(packet));
+		String dump = ByteBufUtil.hexDump(packet);
+		if(dump.length() > 100) dump = dump.substring(0, 100) + "...";
+		LOGGER.debug("Received packet with length {} and content {}", packetLength, dump);
 		out.add(packet);
 		checkpoint(State.READ_NOTHING);
 	}
