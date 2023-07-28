@@ -29,9 +29,13 @@ import java.util.UUID;
  */
 public final class ProfileKeyPairBasedSecurityManager
 {
-    private static final ProfileKeyPairBasedSecurityManager INSTANCE = new ProfileKeyPairBasedSecurityManager();
+    
+	// For now, we do not support custom proxies.
+    private final static YggdrasilAuthenticationService AUTH_SERVICE = new YggdrasilAuthenticationService(Proxy.NO_PROXY);
+
     private static final UUID DEFAULT_NILL_UUID = new UUID(0L, 0L);
 
+    private static final ProfileKeyPairBasedSecurityManager INSTANCE = new ProfileKeyPairBasedSecurityManager();
     public static ProfileKeyPairBasedSecurityManager getInstance()
     {
         return INSTANCE;
@@ -111,19 +115,14 @@ public final class ProfileKeyPairBasedSecurityManager
         return DEFAULT_NILL_UUID;
     }
 
-    private static YggdrasilAuthenticationService getAuthenticationService() {
-        return new YggdrasilAuthenticationService(Proxy.NO_PROXY); //For now, we do not support custom proxies.
-    }
-
     private static UserApiService getApiService() {
         final String accessToken = fetchAccessToken();
-        final YggdrasilAuthenticationService authenticationService = getAuthenticationService();
         if (accessToken.isBlank())
             return UserApiService.OFFLINE;
 
         try
         {
-            return authenticationService.createUserApiService(accessToken);
+            return AUTH_SERVICE.createUserApiService(accessToken);
         }
         catch (AuthenticationException e)
         {
@@ -157,9 +156,7 @@ public final class ProfileKeyPairBasedSecurityManager
     }
 
     private static SignatureValidator fetchMojangValidator() {
-        final YggdrasilAuthenticationService authenticationService = getAuthenticationService();
-
-        final ServicesKeySet keyInfo = authenticationService.getServicesKeySet();
+        final ServicesKeySet keyInfo = AUTH_SERVICE.getServicesKeySet();
         if (keyInfo == null)
             return SignatureValidator.ALWAYS_FAIL;
 
