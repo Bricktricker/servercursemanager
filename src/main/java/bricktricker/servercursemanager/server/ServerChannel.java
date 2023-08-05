@@ -14,6 +14,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import bricktricker.servercursemanager.Utils;
+import cpw.mods.forge.serverpacklocator.ModAccessor;
 import cpw.mods.forge.serverpacklocator.secure.Crypt;
 import cpw.mods.forge.serverpacklocator.secure.ProfileKeyPairBasedSecurityManager;
 import cpw.mods.forge.serverpacklocator.secure.WhitelistVerificationHelper;
@@ -89,7 +90,7 @@ public class ServerChannel extends ChannelInboundHandlerAdapter {
 		}
 		ctx.channel().attr(CHALLENGE_BYTES).set(serverRandom);
 
-		LOGGER.info("Player with UUID {} requested the modpack", playerUUID);
+		LOGGER.info("Player {} requested the modpack", ModAccessor.resolveName(playerUUID));
 	}
 
 	private void handleClientRequest(ChannelHandlerContext ctx, ByteBuf packet) {

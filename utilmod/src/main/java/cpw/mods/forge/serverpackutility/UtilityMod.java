@@ -52,10 +52,16 @@ public class UtilityMod {
             Class<?> clz = LamdbaExceptionUtils.uncheck(() -> Class.forName("cpw.mods.forge.serverpacklocator.ModAccessor", true, classLoader.orElse(Thread.currentThread().getContextClassLoader())));
             Method setIsWhiteListed = LamdbaExceptionUtils.uncheck(() -> clz.getMethod("setIsWhiteListed", Function.class));
             Method setIsWhiteListEnabled = LamdbaExceptionUtils.uncheck(() -> clz.getMethod("setIsWhiteListEnabled", Supplier.class));
+            Method setNameResolver = LamdbaExceptionUtils.uncheck(() -> clz.getMethod("setNameResolver", Function.class));
             LamdbaExceptionUtils.uncheck(() -> setIsWhiteListed.invoke(null, (Function<UUID, CompletableFuture<Boolean>>)(id) -> startedEvent.getServer().submit(() -> {
                 return startedEvent.getServer().getPlayerList().getWhiteList().isWhiteListed(new GameProfile(id, "")); //Name does not matter
             })));
             LamdbaExceptionUtils.uncheck(() -> setIsWhiteListEnabled.invoke(null, (Supplier<CompletableFuture<Boolean>>)() -> startedEvent.getServer().submit(() -> startedEvent.getServer().getPlayerList().isUsingWhitelist())));
+            LamdbaExceptionUtils.uncheck(() -> setNameResolver.invoke(null, (Function<UUID, CompletableFuture<Optional<String>>>)(id) -> {
+                return startedEvent.getServer().submit(() -> {
+                    return startedEvent.getServer().getProfileCache().get(id).map(GameProfile::getName);
+                });
+            }));
 
         } catch (Throwable error) {
             LOGGER.error("Failed to setup Blackboard!", error);
