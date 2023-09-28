@@ -38,10 +38,13 @@ public class ServerChannel extends ChannelInboundHandlerAdapter {
 
 	private final byte[] modpackData;
 	private final byte[] modpackHash;
+	
+	private final SecureRandom rngGenerator;
 
 	public ServerChannel(byte[] modpackData) {
 		this.modpackData = modpackData;
 		this.modpackHash = Utils.computeSha1(new ByteArrayInputStream(modpackData));
+		this.rngGenerator = new SecureRandom();
 	}
 
 	@Override
@@ -69,26 +72,22 @@ public class ServerChannel extends ChannelInboundHandlerAdapter {
 
 	private void handleClientHello(ChannelHandlerContext ctx, ByteBuf packet) {
 		LOGGER.debug("handle client hello");
-		ByteBuf clientRandom = packet.readBytes(32);
 
 		long mostSigBits = packet.readLong();
 		long leastSigBits = packet.readLong();
 		UUID playerUUID = new UUID(mostSigBits, leastSigBits);
 		ctx.channel().attr(PLAYER_UUID_KEY).set(playerUUID);
 
-		byte[] serverRandom = new byte[32];
-		new SecureRandom().nextBytes(serverRandom);
+		// get challenge bytes
+		byte[] challengeBytes = new byte[32];
+		rngGenerator.nextBytes(challengeBytes);
 
-		ByteBuf responseBuf = ctx.alloc().buffer(HEADER.length + 4 + 1 + serverRandom.length);
-		writeHeader(responseBuf, serverRandom.length, 2);
-		responseBuf.writeBytes(serverRandom);
+		ByteBuf responseBuf = ctx.alloc().buffer(HEADER.length + 4 + 1 + challengeBytes.length);
+		writeHeader(responseBuf, challengeBytes.length, 2);
+		responseBuf.writeBytes(challengeBytes);
 		ctx.writeAndFlush(responseBuf);
 
-		// xor clientRandom and serverRandom to get the challenge bytes
-		for(int i = 0; i < serverRandom.length; i++) {
-			serverRandom[i] ^= clientRandom.getByte(i);
-		}
-		ctx.channel().attr(CHALLENGE_BYTES).set(serverRandom);
+		ctx.channel().attr(CHALLENGE_BYTES).set(challengeBytes);
 
 		LOGGER.info("Player {} requested the modpack", ModAccessor.resolveName(playerUUID));
 	}

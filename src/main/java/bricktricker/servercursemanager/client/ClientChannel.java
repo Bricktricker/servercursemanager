@@ -7,7 +7,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.PublicKey;
-import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -28,7 +27,6 @@ public class ClientChannel extends ChannelInboundHandlerAdapter {
 
 	private static final byte[] HEADER = { 'S', 'C', 'M', '1' };
 
-	private final byte[] clientRandom;
 	private final KeyPairResponse playerKeys;
 	private final UUID playerUUID;
 	private final byte[] currentModpackHash;
@@ -37,9 +35,6 @@ public class ClientChannel extends ChannelInboundHandlerAdapter {
 	private boolean downloadSuccessful = false;
 
 	public ClientChannel(/* Nullable */byte[] currentModpackHash, Path modpackPath) {
-		clientRandom = new byte[32];
-		new SecureRandom().nextBytes(clientRandom);
-
 		this.playerKeys = ProfileKeyPairBasedSecurityManager.getKeyPair();
 		this.playerUUID = ProfileKeyPairBasedSecurityManager.getInstance().getPlayerUUID();
 
@@ -50,9 +45,9 @@ public class ClientChannel extends ChannelInboundHandlerAdapter {
 	@Override
 	public void channelActive(ChannelHandlerContext ctx) throws Exception {
 		LOGGER.debug("Sending client hello");
-		ByteBuf requestBuf = ctx.alloc().buffer(HEADER.length + 4 + 1 + clientRandom.length + 16);
-		writeHeader(requestBuf, clientRandom.length + 16, 1);
-		requestBuf.writeBytes(clientRandom);
+		// TODO: remove client random, needs testing
+		ByteBuf requestBuf = ctx.alloc().buffer(HEADER.length + 4 + 1 + 16);
+		writeHeader(requestBuf, 16, 1);
 		requestBuf.writeLong(playerUUID.getMostSignificantBits());
 		requestBuf.writeLong(playerUUID.getLeastSignificantBits());
 		ctx.writeAndFlush(requestBuf);
@@ -82,12 +77,9 @@ public class ClientChannel extends ChannelInboundHandlerAdapter {
 
 	private void handleServerChallenge(ChannelHandlerContext ctx, ByteBuf packet) {
 		LOGGER.debug("Received server challenge, sending key data");
-		// read server random and xor with client random to get challenge bytes
+		// read server challenge bytes
 		byte[] challenge = new byte[32];
 		packet.readBytes(challenge);
-		for(int i = 0; i < challenge.length; i++) {
-			challenge[i] ^= this.clientRandom[i];
-		}
 
 		// Public key
 		PublicKey publicKey = Crypt.stringToRsaPublicKey(this.playerKeys.getPublicKey());
