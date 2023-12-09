@@ -6,7 +6,10 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.KeyPairGenerator;
+import java.security.NoSuchAlgorithmException;
 import java.security.PublicKey;
+import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -15,158 +18,226 @@ import org.apache.logging.log4j.Logger;
 
 import com.mojang.authlib.yggdrasil.response.KeyPairResponse;
 
+import bricktricker.servercursemanager.handshake.CommonChannel;
+import bricktricker.servercursemanager.handshake.HandshakeData;
+import bricktricker.servercursemanager.handshake.HandshakeKeyDerivation;
+import bricktricker.servercursemanager.handshake.PacketType;
+import bricktricker.servercursemanager.handshake.HandshakeKeyDerivation.KeyMaterial;
 import cpw.mods.forge.serverpacklocator.secure.Crypt;
 import cpw.mods.forge.serverpacklocator.secure.ProfileKeyPairBasedSecurityManager;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInboundHandlerAdapter;
 
-public class ClientChannel extends ChannelInboundHandlerAdapter {
+public class ClientChannel extends CommonChannel {
 
-	private static final Logger LOGGER = LogManager.getLogger();
+    private static final Logger LOGGER = LogManager.getLogger();
 
-	private static final byte[] HEADER = { 'S', 'C', 'M', '1' };
+    private final KeyPairResponse playerKeys;
+    private final UUID playerUUID;
+    private final byte[] currentModpackHash;
+    private final Path modpackPath;
 
-	private final KeyPairResponse playerKeys;
-	private final UUID playerUUID;
-	private final byte[] currentModpackHash;
-	private final Path modpackPath;
+    private HandshakeData handshakeData;
 
-	private boolean downloadSuccessful = false;
+    private boolean downloadSuccessful = false;
 
-	public ClientChannel(/* Nullable */byte[] currentModpackHash, Path modpackPath) {
-		this.playerKeys = ProfileKeyPairBasedSecurityManager.getKeyPair();
-		this.playerUUID = ProfileKeyPairBasedSecurityManager.getInstance().getPlayerUUID();
+    public ClientChannel(/* Nullable */byte[] currentModpackHash, Path modpackPath) {
+        this.playerKeys = ProfileKeyPairBasedSecurityManager.getKeyPair();
+        this.playerUUID = ProfileKeyPairBasedSecurityManager.getInstance().getPlayerUUID();
 
-		this.currentModpackHash = currentModpackHash;
-		this.modpackPath = modpackPath;
-	}
+        this.currentModpackHash = currentModpackHash;
+        this.modpackPath = modpackPath;
+    }
 
-	@Override
-	public void channelActive(ChannelHandlerContext ctx) throws Exception {
-		LOGGER.debug("Sending client hello");
-		// TODO: remove client random, needs testing
-		ByteBuf requestBuf = ctx.alloc().buffer(HEADER.length + 4 + 1 + 16);
-		writeHeader(requestBuf, 16, 1);
-		requestBuf.writeLong(playerUUID.getMostSignificantBits());
-		requestBuf.writeLong(playerUUID.getLeastSignificantBits());
-		ctx.writeAndFlush(requestBuf);
-	}
+    @Override
+    public void channelActive(ChannelHandlerContext ctx) throws Exception {
+        LOGGER.debug("Sending client hello");
+        this.handshakeData = new HandshakeData();
+        sendClientHello(ctx);
+    }
 
-	@Override
-	public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-		ByteBuf packet = (ByteBuf) msg;
-		byte packetType = packet.readByte();
+    @Override
+    public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+        ByteBuf packet = (ByteBuf) msg;
+        byte packetTypeIdx = packet.readByte();
+        PacketType packetType = PacketType.values()[packetTypeIdx];
 
-		try {
-			if(packetType == 2) {
-				handleServerChallenge(ctx, packet);
-			}else if(packetType == 4) {
-				handleModpack(ctx, packet);
-			}else if(packetType == 5) {
-				handleServerError(ctx, packet);
-			}else {
-				LOGGER.warn("Received unkown packet with type {}", (int) packetType);
-				ctx.close();
-				throw new UncheckedIOException(new IOException("Received unkown packet with type " + (int) packetType));
-			}
-		}finally {
-			packet.release();
-		}
-	}
+        try {
+            if (packetType == PacketType.SERVER_HELLO) {
+                handleServerHello(ctx, packet);
+            } else if(packetType == PacketType.ENCRYPTED) {
+                ByteBuf decPacket = this.decryptBuffer(handshakeData, packet);
+                packetTypeIdx = decPacket.readByte();
+                packetType = PacketType.values()[packetTypeIdx];
+                
+                if(packetType == PacketType.SERVER_ACCEPTANCE) {
+                    handleAcceptance(ctx, decPacket);
+                }else if(packetType == PacketType.MODPACK_RESPONSE) {
+                    handleModpack(ctx, decPacket);
+                }else {
+                    LOGGER.warn("Received unkown encrypted packet with type {}", packetType.toString());
+                    ctx.close();
+                    throw new UncheckedIOException(
+                            new IOException("Received unkown packet with type " + packetType.toString()));
+                }
+                
+                
+            } else if (packetType == PacketType.ERROR) {
+                handleServerError(ctx, packet);
+            } else {
+                LOGGER.warn("Received unkown packet with type {}", packetType.toString());
+                ctx.close();
+                throw new UncheckedIOException(
+                        new IOException("Received unkown encrypted packet with type " + packetType.toString()));
+            }
+        } finally {
+            packet.release();
+        }
+    }
 
-	private void handleServerChallenge(ChannelHandlerContext ctx, ByteBuf packet) {
-		LOGGER.debug("Received server challenge, sending key data");
-		// read server challenge bytes
-		byte[] challenge = new byte[32];
-		packet.readBytes(challenge);
+    private void sendClientHello(ChannelHandlerContext ctx) {
+        KeyPairGenerator kpg = null;
+        try {
+            kpg = KeyPairGenerator.getInstance("X25519");
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException(e);
+        }
 
-		// Public key
-		PublicKey publicKey = Crypt.stringToRsaPublicKey(this.playerKeys.getPublicKey());
-		byte[] publicKeyRaw = publicKey.getEncoded();
+        this.handshakeData.setEphemeralKeyPair(kpg.generateKeyPair());
+        byte[] cPubKey = this.handshakeData.getEphemeralKeyPair().getPublic().getEncoded();
 
-		long expireDate = Instant.parse(this.playerKeys.getExpiresAt()).toEpochMilli();
+        byte[] clientRandom = new byte[32];
+        new SecureRandom().nextBytes(clientRandom);
 
-		byte[] mojangSigRaw = this.playerKeys.getPublicKeySignature().array();
+        int payloadLen = clientRandom.length + 4 + cPubKey.length;
+        ByteBuf buf = writeHeader(ctx.alloc(), payloadLen, PacketType.CLIENT_HELLO);
+        buf.writeBytes(clientRandom);
+        buf.writeInt(cPubKey.length);
+        buf.writeBytes(cPubKey);
+        this.handshakeData.addOutgoingMessageHash(buf);
+        ctx.writeAndFlush(buf);
+    }
 
-		// Sign the challenge
-		byte[] signatureBytes = ProfileKeyPairBasedSecurityManager.getInstance().getSigningHandler().signer().sign(challenge);
+    private void handleServerHello(ChannelHandlerContext ctx, ByteBuf packet) {
+        this.handshakeData.addIncommingMessageHash(packet);
 
-		int contentLength = 4/* publicKeyLength */ + publicKeyRaw.length + 8/* expireDate */
-				+ 4/* mojangSigLength */ + mojangSigRaw.length + 4/* signatureBytesLength */ + signatureBytes.length + 4/* currentPackHashLength */;
-		if(this.currentModpackHash != null && this.currentModpackHash.length > 0) {
-			contentLength += this.currentModpackHash.length;
-		}
+        byte[] serverRandom = new byte[32];
+        packet.readBytes(serverRandom);
 
-		ByteBuf response = ctx.alloc().buffer(HEADER.length + 4 + 1 + contentLength);
-		writeHeader(response, contentLength, 3);
+        byte[] sPubKeyRaw = readBuffer(packet, 2048);
 
-		response.writeInt(publicKeyRaw.length);
-		response.writeBytes(publicKeyRaw);
+        KeyMaterial keyMaterial = HandshakeKeyDerivation.deriveKeyData(this.handshakeData, sPubKeyRaw);
+        this.handshakeData.setKeyMaterial(keyMaterial);
 
-		response.writeLong(expireDate);
+        // Send client certificate to server
 
-		response.writeInt(mojangSigRaw.length);
-		response.writeBytes(mojangSigRaw);
+        int contentLen = 16; // 16 bytes for the UUID
 
-		response.writeInt(signatureBytes.length);
-		response.writeBytes(signatureBytes);
+        // Public key
+        PublicKey publicKey = Crypt.stringToRsaPublicKey(this.playerKeys.getPublicKey());
+        byte[] publicKeyRaw = publicKey.getEncoded();
+        contentLen += 4; // int for the public key len
+        contentLen += publicKeyRaw.length;
 
-		if(this.currentModpackHash != null && this.currentModpackHash.length > 0) {
-			response.writeInt(this.currentModpackHash.length);
-			response.writeBytes(this.currentModpackHash);
-		}else {
-			// No hash, hash length of 0
-			response.writeInt(0);
-		}
+        long expireDate = Instant.parse(this.playerKeys.getExpiresAt()).toEpochMilli();
+        contentLen += 8; // expire date
 
-		ctx.writeAndFlush(response);
-		LOGGER.debug("Send key reponse");
-	}
+        byte[] mojangSigRaw = this.playerKeys.getPublicKeySignature().array();
+        contentLen += 4; // Mojang signature len
+        contentLen += mojangSigRaw.length;
 
-	private void handleModpack(ChannelHandlerContext ctx, ByteBuf packet) {
-		LOGGER.debug("Received the modpack");
-		byte status = packet.readByte();
-		if(status == 0) {
-			int packLength = packet.readInt();
-			byte[] modpack = new byte[packLength];
-			packet.readBytes(modpack);
-			try(OutputStream os = Files.newOutputStream(this.modpackPath)) {
-				os.write(modpack);
-			}catch(IOException e) {
-				LOGGER.catching(e);
-			}
-		}
-		this.downloadSuccessful = true;
-		ctx.close();
-	}
+        ByteBuf certificateResp = ctx.alloc().heapBuffer(contentLen);
 
-	private void handleServerError(ChannelHandlerContext ctx, ByteBuf packet) {
-		int errorLength = packet.readInt();
-		byte[] errorBytes = new byte[errorLength];
-		packet.readBytes(errorBytes);
-		String error = new String(errorBytes, StandardCharsets.UTF_8);
-		LOGGER.error("Received error {}", error);
-		ctx.close();
-		this.downloadSuccessful = false;
-		throw new UncheckedIOException(new IOException(error));
-	}
+        certificateResp.writeLong(playerUUID.getMostSignificantBits());
+        certificateResp.writeLong(playerUUID.getLeastSignificantBits());
 
-	private static void writeHeader(ByteBuf buf, int contentLength, int packetType) {
-		buf.writeBytes(HEADER);
-		buf.writeInt(contentLength + 1);
-		buf.writeByte(packetType);
-	}
+        certificateResp.writeInt(publicKeyRaw.length);
+        certificateResp.writeBytes(publicKeyRaw);
 
-	@Override
-	public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-		// Close the connection when an exception is raised.
-		LOGGER.catching(cause);
-		ctx.close();
-	}
+        certificateResp.writeLong(expireDate);
 
-	public boolean wasSuccessful() {
-		return this.downloadSuccessful;
-	}
+        certificateResp.writeInt(mojangSigRaw.length);
+        certificateResp.writeBytes(mojangSigRaw);
+        
+        this.handshakeData.addOutgoingMessageHash(certificateResp, true);
+        
+        LOGGER.debug("Send client certificate to server");
+        this.encAndSendBuf(this.handshakeData, ctx, certificateResp, PacketType.CERTIFICATE);
+
+        byte[] messageHash = this.handshakeData.getMessageHash();
+        byte[] signatureBytes = ProfileKeyPairBasedSecurityManager.getInstance().getSigningHandler().signer()
+                .sign(messageHash);
+
+        ByteBuf verifyContent = ctx.alloc().heapBuffer(4 + signatureBytes.length);
+        verifyContent.writeInt(signatureBytes.length);
+        verifyContent.writeBytes(signatureBytes);
+
+        this.encAndSendBuf(handshakeData, ctx, verifyContent, PacketType.CERTIFICATE_VERIFY);
+
+        LOGGER.debug("Send certificate verify to server");
+    }
+
+    private void handleAcceptance(ChannelHandlerContext ctx, ByteBuf response) {
+        boolean valid = response.readBoolean();
+
+        if (!valid) {
+            LOGGER.error("The server could not validate the certificate. Can't download modpack");
+            ctx.close();
+            return;
+        }
+
+        LOGGER.debug("The server could validate the certificate, requesting modpack");
+
+        ByteBuf reqBuf;
+        if (this.currentModpackHash != null && this.currentModpackHash.length > 0) {
+            reqBuf = ctx.alloc().buffer(4 + this.currentModpackHash.length);
+            reqBuf.writeInt(this.currentModpackHash.length);
+            reqBuf.writeBytes(currentModpackHash);
+        } else {
+            // No hash, hash length of 0
+            reqBuf = ctx.alloc().buffer(4);
+            reqBuf.writeInt(0);
+        }
+
+        this.encAndSendBuf(handshakeData, ctx, reqBuf, PacketType.MODPACK_REQUEST);
+    }
+
+    private void handleModpack(ChannelHandlerContext ctx, ByteBuf response) {
+        LOGGER.debug("Received the modpack");
+
+        byte status = response.readByte();
+        if (status == 0) {
+            int packLength = response.readInt();
+            byte[] modpack = new byte[packLength];
+            response.readBytes(modpack);
+            try (OutputStream os = Files.newOutputStream(this.modpackPath)) {
+                os.write(modpack);
+            } catch (IOException e) {
+                LOGGER.catching(e);
+            }
+        }
+        this.downloadSuccessful = true;
+        ctx.close();
+    }
+
+    private void handleServerError(ChannelHandlerContext ctx, ByteBuf packet) {
+        byte[] errorBytes = readBuffer(packet, 2048);
+        String error = new String(errorBytes, StandardCharsets.UTF_8);
+        LOGGER.error("Received error {}", error);
+        ctx.close();
+        this.downloadSuccessful = false;
+        throw new UncheckedIOException(new IOException(error));
+    }
+
+    @Override
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+        // Close the connection when an exception is raised.
+        LOGGER.catching(cause);
+        ctx.close();
+    }
+
+    public boolean wasSuccessful() {
+        return this.downloadSuccessful;
+    }
 
 }

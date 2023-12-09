@@ -163,7 +163,7 @@ public final class ProfileKeyPairBasedSecurityManager
         return SignatureValidator.from(keyInfo);
     }
     
-    public void validatePublicKey(PublicKeyData keyData, UUID sessionId) throws Exception
+    public void validatePublicKey(PublicKeyData keyData, UUID playerUUID) throws Exception
     {
     	if (keyData.key() == null) {
             throw new Exception("Missing public key!");
@@ -171,7 +171,7 @@ public final class ProfileKeyPairBasedSecurityManager
             if (keyData.expiresAt().isBefore(Instant.now())) {
                 throw new Exception("Public key has expired!");
             }
-            if (!keyData.verifyPlayerId(this.mojangValidator, sessionId)) {
+            if (!keyData.verifyPlayerId(this.mojangValidator, playerUUID)) {
                 throw new Exception("Invalid public key!");
             }
         }
