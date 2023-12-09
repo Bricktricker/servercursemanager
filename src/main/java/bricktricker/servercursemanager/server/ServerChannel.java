@@ -16,12 +16,12 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import bricktricker.servercursemanager.Utils;
-import bricktricker.servercursemanager.handshake.CommonChannel;
-import bricktricker.servercursemanager.handshake.HandshakeKeyDerivation;
-import bricktricker.servercursemanager.handshake.HandshakeKeyDerivation.KeyMaterial;
-import bricktricker.servercursemanager.handshake.PacketType;
-import bricktricker.servercursemanager.handshake.ServerHandshakeData;
-import bricktricker.servercursemanager.handshake.ServerHandshakeData.ValidationStatus;
+import bricktricker.servercursemanager.networking.CommonChannel;
+import bricktricker.servercursemanager.networking.HandshakeKeyDerivation;
+import bricktricker.servercursemanager.networking.PacketType;
+import bricktricker.servercursemanager.networking.ServerNetworkData;
+import bricktricker.servercursemanager.networking.HandshakeKeyDerivation.KeyMaterial;
+import bricktricker.servercursemanager.networking.ServerNetworkData.ValidationStatus;
 import cpw.mods.forge.serverpacklocator.ModAccessor;
 import cpw.mods.forge.serverpacklocator.secure.Crypt;
 import cpw.mods.forge.serverpacklocator.secure.ProfileKeyPairBasedSecurityManager;
@@ -39,7 +39,7 @@ public class ServerChannel extends CommonChannel {
 
     private static final Logger LOGGER = LogManager.getLogger();
 
-    private static final AttributeKey<ServerHandshakeData> HANDSHAKE_DATA = AttributeKey.newInstance("handshake");
+    private static final AttributeKey<ServerNetworkData> NETWORK_DATA = AttributeKey.newInstance("handshake");
 
     private final byte[] modpackData;
     private final byte[] modpackHash;
@@ -64,23 +64,23 @@ public class ServerChannel extends CommonChannel {
                 handleClientHello(ctx, packet);
             
             }else if(packetType == PacketType.ENCRYPTED) {
-                ServerHandshakeData handshakeData = ctx.channel().attr(HANDSHAKE_DATA).get();
-                if(handshakeData == null) {
+                ServerNetworkData networkData = ctx.channel().attr(NETWORK_DATA).get();
+                if(networkData == null) {
                     LOGGER.debug("Ip {} send client certificate without sending a client hello", ctx.channel().remoteAddress());
                     sendError(ctx, "No client hello send");
                     return;
                 }
                 
-                ByteBuf decPacket = this.decryptBuffer(handshakeData, packet);
+                ByteBuf decPacket = this.decryptBuffer(networkData, packet);
                 packetTypeIdx = decPacket.readByte();
                 packetType = PacketType.values()[packetTypeIdx];
                 
                 if(packetType == PacketType.CERTIFICATE) {
-                    handleClientCert(ctx, handshakeData, decPacket);
+                    handleClientCert(ctx, networkData, decPacket);
                 }else if(packetType == PacketType.CERTIFICATE_VERIFY) {
-                    handleCertValidation(ctx, handshakeData, decPacket);
+                    handleCertValidation(ctx, networkData, decPacket);
                 }else if(packetType == PacketType.MODPACK_REQUEST) {
-                    handleClientRequest(ctx, handshakeData, decPacket);
+                    handleClientRequest(ctx, networkData, decPacket);
                 }else {
                     LOGGER.warn("Received unkown encrypted packet with type {}", packetType.toString());
                     ctx.close();
@@ -100,10 +100,10 @@ public class ServerChannel extends CommonChannel {
     private void handleClientHello(ChannelHandlerContext ctx, ByteBuf packet) {
         LOGGER.debug("handle client hello");
 
-        ServerHandshakeData handshakeData = new ServerHandshakeData();
-        ctx.channel().attr(HANDSHAKE_DATA).set(handshakeData);
+        ServerNetworkData networkData = new ServerNetworkData();
+        ctx.channel().attr(NETWORK_DATA).set(networkData);
         
-        handshakeData.addIncommingMessageHash(packet);
+        networkData.addIncommingMessageHash(packet);
 
         byte[] clientRandom = new byte[32];
         packet.readBytes(clientRandom);
@@ -119,26 +119,26 @@ public class ServerChannel extends CommonChannel {
         } catch (NoSuchAlgorithmException e) {
             throw new RuntimeException(e);
         }
-        handshakeData.setEphemeralKeyPair(kpg.generateKeyPair());
+        networkData.setEphemeralKeyPair(kpg.generateKeyPair());
         
-        byte[] sPubKey = handshakeData.getEphemeralKeyPair().getPublic().getEncoded();
+        byte[] sPubKey = networkData.getEphemeralKeyPair().getPublic().getEncoded();
         
         int payloadLen = serverRandom.length + 4 + sPubKey.length;
         ByteBuf buf = writeHeader(ctx.alloc(), payloadLen, PacketType.SERVER_HELLO);
         buf.writeBytes(serverRandom);
         buf.writeInt(sPubKey.length);
         buf.writeBytes(sPubKey);
-        handshakeData.addOutgoingMessageHash(buf);
+        networkData.addOutgoingMessageHash(buf);
         ctx.writeAndFlush(buf);
         
-        KeyMaterial keyMaterial = HandshakeKeyDerivation.deriveKeyData(handshakeData, cPubKeyRaw);
-        handshakeData.setKeyMaterial(keyMaterial);
+        KeyMaterial keyMaterial = HandshakeKeyDerivation.deriveKeyData(networkData, cPubKeyRaw);
+        networkData.setKeyMaterial(keyMaterial);
     }
 
-    private void handleClientCert(ChannelHandlerContext ctx, ServerHandshakeData handshakeData,  ByteBuf certificateBuf) {
+    private void handleClientCert(ChannelHandlerContext ctx, ServerNetworkData networkData,  ByteBuf certificateBuf) {
         LOGGER.debug("handle client certificate");
         
-        handshakeData.addIncommingMessageHash(certificateBuf);
+        networkData.addIncommingMessageHash(certificateBuf);
         
         long mostSigBits = certificateBuf.readLong();
         long leastSigBits = certificateBuf.readLong();
@@ -153,8 +153,8 @@ public class ServerChannel extends CommonChannel {
 
         final PublicKeyData keyData = new PublicKeyData(publicKey, expireDate, mojangSigRaw);
         
-        handshakeData.setPlayerPublicKey(publicKey);
-        handshakeData.setPlayerUUID(playerUUID);
+        networkData.setPlayerPublicKey(publicKey);
+        networkData.setPlayerUUID(playerUUID);
         
         LOGGER.info("Player {} requested the modpack", ModAccessor.resolveName(playerUUID));
 
@@ -163,7 +163,7 @@ public class ServerChannel extends CommonChannel {
         } catch (Exception e) {
             LOGGER.catching(e);
             sendError(ctx, e.getMessage());
-            handshakeData.setValidationStatus(ValidationStatus.REJECTED);
+            networkData.setValidationStatus(ValidationStatus.REJECTED);
             return;
         }
 
@@ -171,47 +171,47 @@ public class ServerChannel extends CommonChannel {
         if (whitelistStatus == AllowedStatus.REJECTED) {
             LOGGER.warn("Player {} attempted to download modpack, but is not whitelisted!", playerUUID);
             sendError(ctx, "You are not whitelisted");
-            handshakeData.setValidationStatus(ValidationStatus.REJECTED);
+            networkData.setValidationStatus(ValidationStatus.REJECTED);
             return;
         } else if (whitelistStatus == AllowedStatus.NOT_READY) {
             LOGGER.warn("Player {} attempted to download modpack, whitelist is not loaded yet!", playerUUID);
             sendError(ctx, "Whitelist not ready");
-            handshakeData.setValidationStatus(ValidationStatus.REJECTED);
+            networkData.setValidationStatus(ValidationStatus.REJECTED);
             return;
         }
         
-        handshakeData.setValidationStatus(ValidationStatus.VALID_CERT);
+        networkData.setValidationStatus(ValidationStatus.VALID_CERT);
     }
 
-    private void handleCertValidation(ChannelHandlerContext ctx, ServerHandshakeData handshakeData, ByteBuf validateBuf) {
+    private void handleCertValidation(ChannelHandlerContext ctx, ServerNetworkData networkData, ByteBuf validateBuf) {
         LOGGER.debug("handle client certificate validation");
         
-        if(handshakeData.getValidationStatus() != ValidationStatus.VALID_CERT) {
+        if(networkData.getValidationStatus() != ValidationStatus.VALID_CERT) {
             sendError(ctx, "Certificate was rejeted or you are not whitelisted, can't handle certificate validation");
             return;
         }
         
-        byte[] messageHash = handshakeData.getMessageHash();
+        byte[] messageHash = networkData.getMessageHash();
         
         byte[] signature = readBuffer(validateBuf, 2048);
         
-        boolean valid = SignatureValidator.from(handshakeData.getPlayerPublicKey(), "SHA256withRSA").validate(messageHash, signature);
+        boolean valid = SignatureValidator.from(networkData.getPlayerPublicKey(), "SHA256withRSA").validate(messageHash, signature);
         if(!valid) {
-            handshakeData.setValidationStatus(ValidationStatus.REJECTED);
+            networkData.setValidationStatus(ValidationStatus.REJECTED);
         }else {
-            handshakeData.setValidationStatus(ValidationStatus.ACCEPTED);   
+            networkData.setValidationStatus(ValidationStatus.ACCEPTED);   
         }
         
         ByteBuf respbuf = ctx.alloc().buffer(1);
         respbuf.writeBoolean(valid);
         
-        this.encAndSendBuf(handshakeData, ctx, respbuf, PacketType.SERVER_ACCEPTANCE);
+        this.encAndSendBuf(networkData, ctx, respbuf, PacketType.SERVER_ACCEPTANCE);
     }
     
-    private void handleClientRequest(ChannelHandlerContext ctx, ServerHandshakeData handshakeData, ByteBuf packHashBuf) {
+    private void handleClientRequest(ChannelHandlerContext ctx, ServerNetworkData networkData, ByteBuf packHashBuf) {
         LOGGER.debug("handle client modpack request");
         
-        if(handshakeData.getValidationStatus() != ValidationStatus.ACCEPTED) {
+        if(networkData.getValidationStatus() != ValidationStatus.ACCEPTED) {
             sendError(ctx, "Modpack request rejected");
             return;
         }
@@ -228,7 +228,7 @@ public class ServerChannel extends CommonChannel {
             response.writeInt(this.modpackData.length);
             response.writeBytes(this.modpackData);
         }
-        this.encAndSendBuf(handshakeData, ctx, response, PacketType.MODPACK_RESPONSE).addListener(ChannelFutureListener.CLOSE);
+        this.encAndSendBuf(networkData, ctx, response, PacketType.MODPACK_RESPONSE).addListener(ChannelFutureListener.CLOSE);
         LOGGER.debug("Send modpack to client");
     }
 

@@ -1,4 +1,4 @@
-package bricktricker.servercursemanager.handshake;
+package bricktricker.servercursemanager.networking;
 
 public enum PacketType {
     CLIENT_HELLO,

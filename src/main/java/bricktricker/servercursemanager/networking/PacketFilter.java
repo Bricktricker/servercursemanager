@@ -1,4 +1,4 @@
-package bricktricker.servercursemanager;
+package bricktricker.servercursemanager.networking;
 
 import java.util.List;
 

@@ -1,13 +1,13 @@
-package bricktricker.servercursemanager.handshake;
+package bricktricker.servercursemanager.networking;
 
 import java.security.KeyPair;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
-import bricktricker.servercursemanager.handshake.HandshakeKeyDerivation.KeyMaterial;
+import bricktricker.servercursemanager.networking.HandshakeKeyDerivation.KeyMaterial;
 import io.netty.buffer.ByteBuf;
 
-public class HandshakeData {
+public class NetworkData {
     
     private final MessageDigest messageHash;
     
@@ -18,7 +18,7 @@ public class HandshakeData {
     private int clientSequenceNumber;
     private int serverSequenceNumber;
     
-    public HandshakeData() {
+    public NetworkData() {
         try {
             this.messageHash = MessageDigest.getInstance("SHA-384");
         } catch (NoSuchAlgorithmException e) {

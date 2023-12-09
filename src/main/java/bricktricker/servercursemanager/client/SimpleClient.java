@@ -13,7 +13,7 @@ import java.util.concurrent.Future;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import bricktricker.servercursemanager.PacketFilter;
+import bricktricker.servercursemanager.networking.PacketFilter;
 import cpw.mods.forge.serverpacklocator.LaunchEnvironmentHandler;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.ChannelFuture;

@@ -1,4 +1,4 @@
-package bricktricker.servercursemanager.handshake;
+package bricktricker.servercursemanager.networking;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -19,7 +19,7 @@ import javax.crypto.spec.SecretKeySpec;
 
 public class HandshakeKeyDerivation {
     
-    public static KeyMaterial deriveKeyData(HandshakeData handshakeData, byte[] otherPublicKey) {
+    public static KeyMaterial deriveKeyData(NetworkData networkData, byte[] otherPublicKey) {
         byte[] sharedSecret = null;
         try {
             KeyFactory kf = KeyFactory.getInstance("XDH");
@@ -27,7 +27,7 @@ public class HandshakeKeyDerivation {
             PublicKey cPubKey = kf.generatePublic(keySpec);
             
             KeyAgreement ka = KeyAgreement.getInstance("XDH");
-            ka.init(handshakeData.getEphemeralKeyPair().getPrivate());
+            ka.init(networkData.getEphemeralKeyPair().getPrivate());
             ka.doPhase(cPubKey, true);
 
             sharedSecret = ka.generateSecret();
@@ -45,7 +45,7 @@ public class HandshakeKeyDerivation {
         byte[] derivedSecret = expand(earlySecret, "derived", emptyHash, 48);
         byte[] handshakeSecret = extract(derivedSecret, sharedSecret);
         
-        byte[] helloHash = handshakeData.getMessageHash();
+        byte[] helloHash = networkData.getMessageHash();
         byte[] csecret = expand(handshakeSecret, "c hs traffic", helloHash, 48);
         byte[] ssecret = expand(handshakeSecret, "s hs traffic", helloHash, 48);
         

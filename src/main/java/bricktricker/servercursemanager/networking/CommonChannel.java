@@ -1,4 +1,4 @@
-package bricktricker.servercursemanager.handshake;
+package bricktricker.servercursemanager.networking;
 
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
@@ -57,14 +57,14 @@ public abstract class CommonChannel extends ChannelInboundHandlerAdapter {
         return readBuffer;
     }
     
-    protected ChannelFuture encAndSendBuf(HandshakeData handshakeData, ChannelHandlerContext ctx, ByteBuf payload, PacketType packetType) {
-        ByteBuf encBuf = this.encryptBuffer(handshakeData, payload, ctx.alloc(), packetType);
+    protected ChannelFuture encAndSendBuf(NetworkData networkData, ChannelHandlerContext ctx, ByteBuf payload, PacketType packetType) {
+        ByteBuf encBuf = this.encryptBuffer(networkData, payload, ctx.alloc(), packetType);
         ByteBuf sendBuf = writeHeader(ctx.alloc(), encBuf.writerIndex(), PacketType.ENCRYPTED);
         sendBuf.writeBytes(encBuf);
         return ctx.writeAndFlush(sendBuf);
     }
     
-    protected ByteBuf encryptBuffer(HandshakeData handshakeData, ByteBuf buffer, ByteBufAllocator alloc, PacketType packetType) {
+    protected ByteBuf encryptBuffer(NetworkData networkData, ByteBuf buffer, ByteBufAllocator alloc, PacketType packetType) {
         Cipher cipher;
         try {
             cipher = Cipher.getInstance("AES/GCM/NoPadding");
@@ -72,18 +72,18 @@ public abstract class CommonChannel extends ChannelInboundHandlerAdapter {
             throw new RuntimeException(e);
         }
         
-        var keyMaterial = handshakeData.getKeyMaterial();
+        var keyMaterial = networkData.getKeyMaterial();
 
         byte[] ivOrig = this.currentDist.isClient() ? keyMaterial.clientIV() : keyMaterial.serverIV();
-        int sequenceNumber = this.currentDist.isClient() ? handshakeData.getClientSequenceNumber() : handshakeData.getServerSequenceNumber();
+        int sequenceNumber = this.currentDist.isClient() ? networkData.getClientSequenceNumber() : networkData.getServerSequenceNumber();
         byte[] iv = Arrays.copyOf(ivOrig, ivOrig.length);
         for(int i = 0; i < iv.length; i++) {
             iv[i] ^= sequenceNumber & 0xff;   
         }
         if(this.currentDist.isClient()) {
-            handshakeData.incClientSequenceNumber();
+            networkData.incClientSequenceNumber();
         }else {
-            handshakeData.incServerSequenceNumber();
+            networkData.incServerSequenceNumber();
         }
         
         GCMParameterSpec parameterSpec = new GCMParameterSpec(128, iv); //128 bit auth tag length
@@ -114,7 +114,7 @@ public abstract class CommonChannel extends ChannelInboundHandlerAdapter {
         return Unpooled.wrappedBuffer(cipherText);
     }
     
-    protected ByteBuf decryptBuffer(HandshakeData handshakeData, ByteBuf buffer) {
+    protected ByteBuf decryptBuffer(NetworkData networkData, ByteBuf buffer) {
         Cipher cipher;
         try {
             cipher = Cipher.getInstance("AES/GCM/NoPadding");
@@ -122,18 +122,18 @@ public abstract class CommonChannel extends ChannelInboundHandlerAdapter {
             throw new RuntimeException(e);
         }
         
-        var keyMaterial = handshakeData.getKeyMaterial();
+        var keyMaterial = networkData.getKeyMaterial();
 
         byte[] ivOrig = this.currentDist.isDedicatedServer() ? keyMaterial.clientIV() : keyMaterial.serverIV();
-        int sequenceNumber = this.currentDist.isDedicatedServer() ? handshakeData.getClientSequenceNumber() : handshakeData.getServerSequenceNumber();
+        int sequenceNumber = this.currentDist.isDedicatedServer() ? networkData.getClientSequenceNumber() : networkData.getServerSequenceNumber();
         byte[] iv = Arrays.copyOf(ivOrig, ivOrig.length);
         for(int i = 0; i < iv.length; i++) {
             iv[i] ^= sequenceNumber & 0xff;   
         }
         if(this.currentDist.isDedicatedServer()) {
-            handshakeData.incClientSequenceNumber();
+            networkData.incClientSequenceNumber();
         }else {
-            handshakeData.incServerSequenceNumber();
+            networkData.incServerSequenceNumber();
         }
         
         GCMParameterSpec parameterSpec = new GCMParameterSpec(128, iv); //128 bit auth tag length

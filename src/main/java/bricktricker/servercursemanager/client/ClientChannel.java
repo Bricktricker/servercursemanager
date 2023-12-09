@@ -18,11 +18,11 @@ import org.apache.logging.log4j.Logger;
 
 import com.mojang.authlib.yggdrasil.response.KeyPairResponse;
 
-import bricktricker.servercursemanager.handshake.CommonChannel;
-import bricktricker.servercursemanager.handshake.HandshakeData;
-import bricktricker.servercursemanager.handshake.HandshakeKeyDerivation;
-import bricktricker.servercursemanager.handshake.PacketType;
-import bricktricker.servercursemanager.handshake.HandshakeKeyDerivation.KeyMaterial;
+import bricktricker.servercursemanager.networking.CommonChannel;
+import bricktricker.servercursemanager.networking.NetworkData;
+import bricktricker.servercursemanager.networking.HandshakeKeyDerivation;
+import bricktricker.servercursemanager.networking.PacketType;
+import bricktricker.servercursemanager.networking.HandshakeKeyDerivation.KeyMaterial;
 import cpw.mods.forge.serverpacklocator.secure.Crypt;
 import cpw.mods.forge.serverpacklocator.secure.ProfileKeyPairBasedSecurityManager;
 import io.netty.buffer.ByteBuf;
@@ -37,7 +37,7 @@ public class ClientChannel extends CommonChannel {
     private final byte[] currentModpackHash;
     private final Path modpackPath;
 
-    private HandshakeData handshakeData;
+    private NetworkData networkData;
 
     private boolean downloadSuccessful = false;
 
@@ -52,7 +52,7 @@ public class ClientChannel extends CommonChannel {
     @Override
     public void channelActive(ChannelHandlerContext ctx) throws Exception {
         LOGGER.debug("Sending client hello");
-        this.handshakeData = new HandshakeData();
+        this.networkData = new NetworkData();
         sendClientHello(ctx);
     }
 
@@ -66,7 +66,7 @@ public class ClientChannel extends CommonChannel {
             if (packetType == PacketType.SERVER_HELLO) {
                 handleServerHello(ctx, packet);
             } else if(packetType == PacketType.ENCRYPTED) {
-                ByteBuf decPacket = this.decryptBuffer(handshakeData, packet);
+                ByteBuf decPacket = this.decryptBuffer(networkData, packet);
                 packetTypeIdx = decPacket.readByte();
                 packetType = PacketType.values()[packetTypeIdx];
                 
@@ -103,8 +103,8 @@ public class ClientChannel extends CommonChannel {
             throw new RuntimeException(e);
         }
 
-        this.handshakeData.setEphemeralKeyPair(kpg.generateKeyPair());
-        byte[] cPubKey = this.handshakeData.getEphemeralKeyPair().getPublic().getEncoded();
+        this.networkData.setEphemeralKeyPair(kpg.generateKeyPair());
+        byte[] cPubKey = this.networkData.getEphemeralKeyPair().getPublic().getEncoded();
 
         byte[] clientRandom = new byte[32];
         new SecureRandom().nextBytes(clientRandom);
@@ -114,20 +114,20 @@ public class ClientChannel extends CommonChannel {
         buf.writeBytes(clientRandom);
         buf.writeInt(cPubKey.length);
         buf.writeBytes(cPubKey);
-        this.handshakeData.addOutgoingMessageHash(buf);
+        this.networkData.addOutgoingMessageHash(buf);
         ctx.writeAndFlush(buf);
     }
 
     private void handleServerHello(ChannelHandlerContext ctx, ByteBuf packet) {
-        this.handshakeData.addIncommingMessageHash(packet);
+        this.networkData.addIncommingMessageHash(packet);
 
         byte[] serverRandom = new byte[32];
         packet.readBytes(serverRandom);
 
         byte[] sPubKeyRaw = readBuffer(packet, 2048);
 
-        KeyMaterial keyMaterial = HandshakeKeyDerivation.deriveKeyData(this.handshakeData, sPubKeyRaw);
-        this.handshakeData.setKeyMaterial(keyMaterial);
+        KeyMaterial keyMaterial = HandshakeKeyDerivation.deriveKeyData(this.networkData, sPubKeyRaw);
+        this.networkData.setKeyMaterial(keyMaterial);
 
         // Send client certificate to server
 
@@ -159,12 +159,12 @@ public class ClientChannel extends CommonChannel {
         certificateResp.writeInt(mojangSigRaw.length);
         certificateResp.writeBytes(mojangSigRaw);
         
-        this.handshakeData.addOutgoingMessageHash(certificateResp, true);
+        this.networkData.addOutgoingMessageHash(certificateResp, true);
         
         LOGGER.debug("Send client certificate to server");
-        this.encAndSendBuf(this.handshakeData, ctx, certificateResp, PacketType.CERTIFICATE);
+        this.encAndSendBuf(this.networkData, ctx, certificateResp, PacketType.CERTIFICATE);
 
-        byte[] messageHash = this.handshakeData.getMessageHash();
+        byte[] messageHash = this.networkData.getMessageHash();
         byte[] signatureBytes = ProfileKeyPairBasedSecurityManager.getInstance().getSigningHandler().signer()
                 .sign(messageHash);
 
@@ -172,7 +172,7 @@ public class ClientChannel extends CommonChannel {
         verifyContent.writeInt(signatureBytes.length);
         verifyContent.writeBytes(signatureBytes);
 
-        this.encAndSendBuf(handshakeData, ctx, verifyContent, PacketType.CERTIFICATE_VERIFY);
+        this.encAndSendBuf(networkData, ctx, verifyContent, PacketType.CERTIFICATE_VERIFY);
 
         LOGGER.debug("Send certificate verify to server");
     }
@@ -199,7 +199,7 @@ public class ClientChannel extends CommonChannel {
             reqBuf.writeInt(0);
         }
 
-        this.encAndSendBuf(handshakeData, ctx, reqBuf, PacketType.MODPACK_REQUEST);
+        this.encAndSendBuf(networkData, ctx, reqBuf, PacketType.MODPACK_REQUEST);
     }
 
     private void handleModpack(ChannelHandlerContext ctx, ByteBuf response) {

@@ -1,9 +1,9 @@
-package bricktricker.servercursemanager.handshake;
+package bricktricker.servercursemanager.networking;
 
 import java.security.PublicKey;
 import java.util.UUID;
 
-public class ServerHandshakeData extends HandshakeData {
+public class ServerNetworkData extends NetworkData {
     
     private UUID playerUUID;
     
