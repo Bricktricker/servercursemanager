@@ -22,10 +22,11 @@ import bricktricker.servercursemanager.server.ServerSideHandler;
 import cpw.mods.forge.serverpacklocator.LaunchEnvironmentHandler;
 import cpw.mods.forge.serverpacklocator.ModAccessor;
 import cpw.mods.modlauncher.api.LamdbaExceptionUtils;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.forgespi.locating.IModDirectoryLocatorFactory;
-import net.minecraftforge.forgespi.locating.IModFile;
-import net.minecraftforge.forgespi.locating.IModLocator;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.neoforgespi.locating.IModDirectoryLocatorFactory;
+import net.neoforged.neoforgespi.locating.IModFile;
+import net.neoforged.neoforgespi.locating.IModLocator;
+
 
 public class ServerCurseManager implements IModLocator {
 

@@ -4,8 +4,8 @@ import cpw.mods.modlauncher.Environment;
 import cpw.mods.modlauncher.Launcher;
 import cpw.mods.modlauncher.api.IEnvironment;
 import cpw.mods.modlauncher.api.TypesafeMap;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.forgespi.locating.IModDirectoryLocatorFactory;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.neoforgespi.locating.IModDirectoryLocatorFactory;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -40,14 +40,14 @@ public class LaunchEnvironmentHandler {
     }
 
     public Dist getDist() {
-        return getValue(net.minecraftforge.forgespi.Environment.Keys.DIST).orElse(Dist.CLIENT);
+        return getValue(net.neoforged.neoforgespi.Environment.Keys.DIST).orElse(Dist.CLIENT);
     }
 
     public IModDirectoryLocatorFactory getModFolderFactory() {
-        return getValue(net.minecraftforge.forgespi.Environment.Keys.MODDIRECTORYFACTORY).orElseThrow(()->new IllegalStateException("Missing MODDIRECTORYFACTORY, wut?"));
+        return getValue(net.neoforged.neoforgespi.Environment.Keys.MODDIRECTORYFACTORY).orElseThrow(()->new IllegalStateException("Missing MODDIRECTORYFACTORY, wut?"));
     }
 
     public void addProgressMessage(String message) {
-        getValue(net.minecraftforge.forgespi.Environment.Keys.PROGRESSMESSAGE).ifPresent(pm->pm.accept(message));
+        getValue(net.neoforged.neoforgespi.Environment.Keys.PROGRESSMESSAGE).ifPresent(pm->pm.accept(message));
     }
 }
