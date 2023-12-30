@@ -1,6 +1,5 @@
 package cpw.mods.forge.serverpacklocator.secure;
 
-import com.mojang.authlib.exceptions.AuthenticationException;
 import com.mojang.authlib.minecraft.UserApiService;
 import com.mojang.authlib.yggdrasil.ServicesKeySet;
 import com.mojang.authlib.yggdrasil.YggdrasilAuthenticationService;
@@ -120,14 +119,7 @@ public final class ProfileKeyPairBasedSecurityManager
         if (accessToken.isBlank())
             return UserApiService.OFFLINE;
 
-        try
-        {
-            return AUTH_SERVICE.createUserApiService(accessToken);
-        }
-        catch (AuthenticationException e)
-        {
-            throw new RuntimeException("Failed to create user api service to get profile key pair!", e);
-        }
+        return AUTH_SERVICE.createUserApiService(accessToken);
     }
 
     public static KeyPairResponse getKeyPair() {
@@ -140,11 +132,11 @@ public final class ProfileKeyPairBasedSecurityManager
         if (keyPairResponse == null)
             return null;
 
-        return new ProfileKeyPair(Crypt.stringToPemRsaPrivateKey(keyPairResponse.getPrivateKey()),
+        return new ProfileKeyPair(Crypt.stringToPemRsaPrivateKey(keyPairResponse.keyPair().privateKey()),
                 new PublicKeyData(
-                Crypt.stringToRsaPublicKey(keyPairResponse.getPublicKey()),
-                Instant.parse(keyPairResponse.getExpiresAt()),
-                keyPairResponse.getPublicKeySignature().array()));
+                Crypt.stringToRsaPublicKey(keyPairResponse.keyPair().publicKey()),
+                Instant.parse(keyPairResponse.expiresAt()),
+                keyPairResponse.publicKeySignature().array()));
     }
 
     private static SigningHandler fetchSigningHandler() {

@@ -134,15 +134,15 @@ public class ClientChannel extends CommonChannel {
         int contentLen = 16; // 16 bytes for the UUID
 
         // Public key
-        PublicKey publicKey = Crypt.stringToRsaPublicKey(this.playerKeys.getPublicKey());
+        PublicKey publicKey = Crypt.stringToRsaPublicKey(this.playerKeys.keyPair().publicKey());
         byte[] publicKeyRaw = publicKey.getEncoded();
         contentLen += 4; // int for the public key len
         contentLen += publicKeyRaw.length;
 
-        long expireDate = Instant.parse(this.playerKeys.getExpiresAt()).toEpochMilli();
+        long expireDate = Instant.parse(this.playerKeys.expiresAt()).toEpochMilli();
         contentLen += 8; // expire date
 
-        byte[] mojangSigRaw = this.playerKeys.getPublicKeySignature().array();
+        byte[] mojangSigRaw = this.playerKeys.publicKeySignature().array();
         contentLen += 4; // Mojang signature len
         contentLen += mojangSigRaw.length;
 
