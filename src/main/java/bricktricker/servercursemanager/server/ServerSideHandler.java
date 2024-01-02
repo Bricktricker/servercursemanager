@@ -137,13 +137,13 @@ public class ServerSideHandler extends SideHandler {
 			modMapping = this.modMappings.stream().filter(mod -> mod.projectID == projectID && mod.fileID == fileID).findAny();
 		}
 
-		modMapping.filter(mapping -> {
+		modMapping = modMapping.filter(mapping -> {
 			Path modFile = this.serverModsPath.resolve(mapping.fileName);
 			return Files.exists(modFile);
 		});
 
 		// check hash
-		modMapping.filter(mapping -> {
+		modMapping = modMapping.filter(mapping -> {
 			Path modFile = this.serverModsPath.resolve(mapping.fileName);
 			String hash = Utils.computeSha1Str(modFile);
 			return hash.equals(mapping.sha1);
@@ -364,10 +364,10 @@ public class ServerSideHandler extends SideHandler {
 		byte[] packData = baos.toByteArray();
 		LOGGER.debug("Generated modpack {} bytes big", packData.length);
 
-		RequestServer.run(this, packData);
-
 		// Initialize ProfileKeyPairBasedSecurityManager
 		ProfileKeyPairBasedSecurityManager.getInstance();
+		
+		RequestServer.run(this, packData);
 	}
 
 	public int getPort() {
