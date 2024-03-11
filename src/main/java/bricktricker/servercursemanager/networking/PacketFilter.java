@@ -44,19 +44,14 @@ public class PacketFilter extends ReplayingDecoder<State> {
 		if(packetLength <= 0) {
 			checkpoint(State.READ_NOTHING);
 			LOGGER.warn("Received packet with a negative length {}", packetLength);
-			LOGGER.info(ByteBufUtil.hexDump(in, 0, 15)); // print the first 15 bytes
 			return;
 		}
 		if(packetLength > this.maxPacketLength) {
 			checkpoint(State.READ_NOTHING);
 			LOGGER.warn("Received packet that is to big, packet size: {} bytes", packetLength);
-			LOGGER.info(ByteBufUtil.hexDump(in, 0, Math.min(100, this.maxPacketLength)));
 			return;
 		}
 		ByteBuf packet = in.readBytes(packetLength);
-		String dump = ByteBufUtil.hexDump(packet);
-		if(dump.length() > 100) dump = dump.substring(0, 100) + "...";
-		LOGGER.debug("Received packet with length {} and content {}", packetLength, dump);
 		out.add(packet);
 		checkpoint(State.READ_NOTHING);
 	}

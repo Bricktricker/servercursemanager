@@ -169,7 +169,7 @@ public class ServerSideHandler extends SideHandler {
 		}
 
 		int numDownloadThreads = Math.max(Runtime.getRuntime().availableProcessors() / 2, 1);
-		this.downloadThreadpool = new ThreadPoolExecutor(1, numDownloadThreads, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<Runnable>());
+		this.downloadThreadpool = new ThreadPoolExecutor(0, numDownloadThreads, 10L, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
 
 		ByteArrayOutputStream baos = new ByteArrayOutputStream();
 		ZipOutputStream zos = new ZipOutputStream(baos);
