@@ -6,7 +6,6 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufUtil;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.ReplayingDecoder;
 
@@ -34,6 +33,7 @@ public class PacketFilter extends ReplayingDecoder<State> {
 			for(int i = 0; i < HEADER.length; i++) {
 				if(HEADER[i] != in.readByte()) {
 					LOGGER.warn("Received packet with invalid header");
+					ctx.close(null);
 					return;
 				}
 			}
