@@ -6,16 +6,13 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.StreamSupport;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -26,15 +23,15 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
 import bricktricker.servercursemanager.CopyOption;
-import bricktricker.servercursemanager.CurseDownloader;
 import bricktricker.servercursemanager.SideHandler;
 import bricktricker.servercursemanager.Utils;
 import bricktricker.servercursemanager.client.ClientSideHandler;
+import bricktricker.servercursemanager.server.modhandler.CurseModHandler;
+import bricktricker.servercursemanager.server.modhandler.LocalModHandler;
+import bricktricker.servercursemanager.server.modhandler.ModHandler;
 import cpw.mods.forge.serverpacklocator.secure.ProfileKeyPairBasedSecurityManager;
 
 public class ServerSideHandler extends SideHandler {
-
-	private List<ModMapping> modMappings;
 	
 	private JsonObject packConfig;
 
@@ -80,88 +77,9 @@ public class ServerSideHandler extends SideHandler {
 		return true;
 	}
 
-	protected void loadMappings() {
-		this.modMappings = new ArrayList<>();
-		Path modMappingsFile = this.serverModsPath.resolve("files.json");
-		if(!Files.exists(modMappingsFile)) {
-			return;
-		}
-
-		JsonArray mappingArray = Utils.loadJson(modMappingsFile).getAsJsonArray();
-		StreamSupport.stream(mappingArray.spliterator(), false)
-			.map(JsonElement::getAsJsonObject)
-			.map(mod -> {
-				int projectID = mod.getAsJsonPrimitive("projectID").getAsInt();
-				int fileID = mod.getAsJsonPrimitive("fileID").getAsInt();
-				String fileName = mod.getAsJsonPrimitive("fileName").getAsString();
-				String downloadUrl = mod.getAsJsonPrimitive("url").getAsString();
-				String sha1 = mod.getAsJsonPrimitive("sha1").getAsString();
-	
-				return new ModMapping(projectID, fileID, fileName, downloadUrl, sha1);
-			})
-			.forEach(modMappings::add);
-	}
-
-	private void addMapping(ModMapping mapping) {
-		synchronized(this.modMappings) {
-			this.modMappings.removeIf(mod -> mod.projectID == mapping.projectID && mod.fileID == mapping.fileID);
-			this.modMappings.add(mapping);
-		}
-	}
-
-	private void saveAndCloseMappings() {
-		if(this.modMappings == null) {
-			return;
-		}
-
-		JsonArray mappingArray = new JsonArray();
-		for(ModMapping mapping : this.modMappings) {
-			JsonObject mod = new JsonObject();
-
-			mod.addProperty("projectID", mapping.projectID);
-			mod.addProperty("fileID", mapping.fileID);
-			mod.addProperty("fileName", mapping.fileName);
-			mod.addProperty("url", mapping.downloadUrl);
-			mod.addProperty("sha1", mapping.sha1);
-
-			mappingArray.add(mod);
-		}
-
-		Utils.saveJson(mappingArray, this.serverModsPath.resolve("files.json"));
-		this.modMappings = null;
-	}
-
-	private Optional<ModMapping> getMapping(int projectID, int fileID) {
-		Optional<ModMapping> modMapping;
-		synchronized(this.modMappings) {
-			modMapping = this.modMappings.stream().filter(mod -> mod.projectID == projectID && mod.fileID == fileID).findAny();
-		}
-
-		modMapping = modMapping.filter(mapping -> {
-			Path modFile = this.serverModsPath.resolve(mapping.fileName);
-			return Files.exists(modFile);
-		});
-
-		// check hash
-		modMapping = modMapping.filter(mapping -> {
-			Path modFile = this.serverModsPath.resolve(mapping.fileName);
-			String hash = Utils.computeSha1Str(modFile);
-			return hash.equals(mapping.sha1);
-		});
-
-		return modMapping;
-	}
-
-	public void doCleanup() {
-		super.doCleanup();
-		this.saveAndCloseMappings();
-	}
-
 	@Override
 	public void initialize() {
 		super.initialize();
-
-		this.loadMappings();
 		
 		CopyOption globalCopyOption = CopyOption.KEEP;
 		if(packConfig.has("copyOption")) {
@@ -170,6 +88,10 @@ public class ServerSideHandler extends SideHandler {
 
 		int numDownloadThreads = Math.max(Runtime.getRuntime().availableProcessors() / 2, 1);
 		this.downloadThreadpool = new ThreadPoolExecutor(0, numDownloadThreads, 10L, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
+		
+		// Mod handler
+		var curseModHandler = new CurseModHandler(getServermodsFolder(), downloadThreadpool);
+		var localModHandler = new LocalModHandler(getServermodsFolder(), downloadThreadpool);
 
 		ByteArrayOutputStream baos = new ByteArrayOutputStream();
 		ZipOutputStream zos = new ZipOutputStream(baos);
@@ -179,7 +101,7 @@ public class ServerSideHandler extends SideHandler {
 		final JsonArray manifestMods = new JsonArray();
 
 		// we download the mods asynchronously, so we save the futures here
-		final List<CompletableFuture<ModMapping>> modMappingFutures = new ArrayList<>();
+		final List<CompletableFuture<ModHandler.ModResult>> modResultFutures = new ArrayList<>();
 		
 		JsonArray mods = packConfig.getAsJsonArray(SideHandler.MODS);
 		for(JsonElement modE : mods) {
@@ -187,78 +109,29 @@ public class ServerSideHandler extends SideHandler {
 
 			final String source = mod.getAsJsonPrimitive("source").getAsString();
 			if("curse".equalsIgnoreCase(source)) {
-				int projectID = mod.getAsJsonPrimitive("projectID").getAsInt();
-				int fileID = mod.getAsJsonPrimitive("fileID").getAsInt();
-				
-				var future = this.getMapping(projectID, fileID)
-					.map(CompletableFuture::completedFuture)
-					.orElseGet(() -> CompletableFuture.supplyAsync(() -> {
-						try {
-							LOGGER.debug("Downloading curse file {} for project {}", fileID, projectID);
-							ModMapping m = CurseDownloader.downloadMod(projectID, fileID, getServermodsFolder());
-							this.addMapping(m);
-							return m;
-						}catch(IOException e) {
-							LOGGER.catching(e);
-							return null;
-						}
-					}, downloadThreadpool));
-				
-				modMappingFutures.add(future);
+			    modResultFutures.add(curseModHandler.handleMod(mod, zos));
 			}else if("local".equals(source)) {
-				String modPath = mod.getAsJsonPrimitive("mod").getAsString();
-				Path sourcePath = Paths.get(modPath);
-				String modName = sourcePath.getFileName().toString();
-				
-				if(!Files.isRegularFile(sourcePath) || !Files.exists(sourcePath)) {
-					LOGGER.error("Mod path {} does not point to a file", modPath);
-					continue;
-				}
-				
-				// Copy local mods to the servermods folder
-				try {
-					Files.copy(sourcePath, getServermodsFolder().resolve(modName), StandardCopyOption.REPLACE_EXISTING);
-				}catch(IOException e) {
-					LOGGER.catching(e);
-					continue;
-				}
-				
-				JsonObject manifestMod = new JsonObject();
-				manifestMod.addProperty("source", source);
-				manifestMod.addProperty("file", modName);
-
-				// Copy local mods to modpack.zip
-				ZipEntry entry = Utils.getStableEntry("mods/" + modName);
-				try {
-					zos.putNextEntry(entry);
-					Files.copy(sourcePath, zos);
-					zos.closeEntry();
-				}catch(IOException e) {
-					LOGGER.catching(e);
-					continue;
-				}
-				
-				manifestMods.add(manifestMod);
-				this.loadedModNames.add(modName);
+			    modResultFutures.add(localModHandler.handleMod(mod, zos));
 			}else {
 				LOGGER.error("Unkown source {} for a mod", source);
 			}
 		}
 		
 		// get all downloaded mods, add the to the 'manifestMods' list
-		for(var future : modMappingFutures) {
-			ModMapping mapping = future.join();
-			if(mapping == null) {
+		for(var future : modResultFutures) {
+		    ModHandler.ModResult result = future.join();
+			if(result == null) {
 				continue;
 			}
-
-			var manifestMod = new JsonObject();
-			manifestMod.addProperty("source", "remote");
-			manifestMod.addProperty("url", mapping.downloadUrl());
-			manifestMod.addProperty("file", mapping.fileName());
-			manifestMod.addProperty("sha1", mapping.sha1());
-			manifestMods.add(manifestMod);
-			this.loadedModNames.add(mapping.fileName());
+			
+			if(result.loadOnServer()) {
+			    this.loadedModNames.add(result.modName());   
+			}
+			
+			var manifestData = result.manifestData();
+			if(manifestData != null) {
+			    manifestMods.add(manifestData);   
+			}
 		}
 
 		// gather aditional files
@@ -345,6 +218,9 @@ public class ServerSideHandler extends SideHandler {
 			}
 		}
 		
+		curseModHandler.close();
+		localModHandler.close();
+		
 		// create modpack zip
 		JsonObject manifest = new JsonObject();
 		manifest.add(SideHandler.MODS, manifestMods);
@@ -374,7 +250,6 @@ public class ServerSideHandler extends SideHandler {
 		return this.packConfig.getAsJsonPrimitive("port").getAsInt();
 	}
 
-	public static record ModMapping(int projectID, int fileID, String fileName, String downloadUrl, String sha1) {
-	}
-
+    public static record ModMapping(int projectID, int fileID, String fileName, String downloadUrl, String sha1) {
+    }
 }

@@ -1,6 +1,7 @@
 package bricktricker.servercursemanager;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.net.URI;
 import java.net.URL;
 import java.nio.file.FileSystem;
@@ -15,7 +16,6 @@ import java.util.Map;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
-import org.apache.commons.lang3.exception.UncheckedException;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -107,7 +107,7 @@ public class ServerCurseManager implements IModLocator {
             final Path utilModPath = thiszip.getPath("utilmod", "serverpackutility.zip");
             Files.copy(utilModPath, serverModsPath.resolve("serverpackutility.jar"), StandardCopyOption.REPLACE_EXISTING);
         }catch(IOException e) {
-            throw new UncheckedException(e);
+            throw new UncheckedIOException(e);
         }
 	}
 

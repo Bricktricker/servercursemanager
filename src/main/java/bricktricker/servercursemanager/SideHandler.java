@@ -24,7 +24,6 @@ public abstract class SideHandler {
 	
 	protected CompletableFuture<Void> installTask;
 	protected ExecutorService downloadThreadpool;
-	protected ExecutorService singleExcecutor;
 
 	protected SideHandler(Path gameDir) {
 		this.serverpackFolder = Utils.createOrGetDirectory(gameDir, "serverpack");
@@ -51,14 +50,10 @@ public abstract class SideHandler {
 			try {
 				this.downloadThreadpool.shutdown();
 				this.downloadThreadpool.awaitTermination(2, TimeUnit.MINUTES);
-				
-				this.singleExcecutor.shutdown();
-				this.singleExcecutor.awaitTermination(2, TimeUnit.MINUTES);
 			}catch(InterruptedException e) {
 				LOGGER.catching(e);
 			}finally {
 				this.downloadThreadpool = null;
-				this.singleExcecutor = null;
 				this.installTask = null;
 			}
 		}
