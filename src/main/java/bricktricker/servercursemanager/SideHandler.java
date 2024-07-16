@@ -1,9 +1,9 @@
 package bricktricker.servercursemanager;
 
 import java.nio.file.Path;
-import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -36,7 +36,7 @@ public abstract class SideHandler {
 	}
 
 	public void initialize() {
-		this.loadedModNames = new HashSet<>();
+		this.loadedModNames = ConcurrentHashMap.newKeySet();
 	}
 	
 	public void waitForInstall() {

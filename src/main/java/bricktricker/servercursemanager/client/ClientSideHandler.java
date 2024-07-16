@@ -1,6 +1,8 @@
 package bricktricker.servercursemanager.client;
 
 import java.io.IOException;
+import java.nio.file.FileSystem;
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -8,12 +10,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipFile;
 
 import com.electronwill.nightconfig.core.file.CommentedFileConfig;
 import com.electronwill.nightconfig.core.file.FileConfig;
@@ -109,12 +108,11 @@ public class ClientSideHandler extends SideHandler {
 			return;
 		}
 
-		this.singleExcecutor = Executors.newSingleThreadExecutor();
-		final List<CompletableFuture<Void>> futures = new ArrayList<>();
+		final List<CompletableFuture<String>> futures = new ArrayList<>();
 
-		try(ZipFile zf = new ZipFile(modpackZip.toFile())) {
-			ZipEntry manifestEntry = zf.getEntry("manifest.json");
-			JsonObject manifest = Utils.loadJson(zf.getInputStream(manifestEntry)).getAsJsonObject();
+		try(FileSystem modpackSystem = FileSystems.newFileSystem(modpackZip)) {
+		    Path manifestPath = modpackSystem.getPath("manifest.json");
+			JsonObject manifest = Utils.loadJson(Files.newInputStream(manifestPath)).getAsJsonObject();
 
 			JsonArray mods = manifest.getAsJsonArray(SideHandler.MODS);
 			int numDownloadThreads = Math.min(Math.max(Runtime.getRuntime().availableProcessors() / 2, 1), mods.size());
@@ -128,28 +126,24 @@ public class ClientSideHandler extends SideHandler {
 					String sha1 = mod.getAsJsonPrimitive("sha1").getAsString();
 					String fileName = mod.getAsJsonPrimitive("file").getAsString();
 
-					CompletableFuture<Void> future = CompletableFuture.supplyAsync(() -> {
+					CompletableFuture<String> future = CompletableFuture.supplyAsync(() -> {
 						try {
 							CurseDownloader.downloadFile(url, fileName, sha1, getServermodsFolder());
+							this.loadedModNames.add(fileName);
 							return fileName;
 						}catch(IOException e) {
 							LOGGER.catching(e);
 							return null;
 						}
-					}, downloadThreadpool).thenAcceptAsync(f -> {
-						if(f != null) {
-							this.loadedModNames.add(f);
-						}
-					}, singleExcecutor);
+					}, downloadThreadpool);
 
 					futures.add(future);
 
 				}else if("local".equals(source)) {
 					String filename = mod.getAsJsonPrimitive("file").getAsString();
-					ZipEntry modEntry = zf.getEntry("mods/" + filename);
-					Files.copy(zf.getInputStream(modEntry), getServermodsFolder().resolve(filename), StandardCopyOption.REPLACE_EXISTING);
-					CompletableFuture<Void> future = CompletableFuture.runAsync(() -> this.loadedModNames.add(filename), singleExcecutor);
-					futures.add(future);
+					Path modEntryPath = modpackSystem.getPath("mods", filename);
+					Files.copy(modEntryPath, getServermodsFolder().resolve(filename), StandardCopyOption.REPLACE_EXISTING);
+					this.loadedModNames.add(filename);
 				}
 			}
 
@@ -157,11 +151,11 @@ public class ClientSideHandler extends SideHandler {
 			for(JsonElement fileE : additional) {
 				String file = fileE.getAsJsonObject().getAsJsonPrimitive("file").getAsString();
 				CopyOption copyOption = CopyOption.getOption(fileE.getAsJsonObject().getAsJsonPrimitive("copyOption").getAsString());
-				ZipEntry fileEntry = zf.getEntry(SideHandler.ADDITIONAL + "/" + file);
+				Path fileEntry = modpackSystem.getPath(SideHandler.ADDITIONAL, file);
 				Path destination = LaunchEnvironmentHandler.INSTANCE.getGameDir().resolve(file);
 				Files.createDirectories(destination.getParent());
 				if(copyOption.writeFile(destination)) {
-					Files.copy(zf.getInputStream(fileEntry), destination, StandardCopyOption.REPLACE_EXISTING);
+					Files.copy(fileEntry, destination, StandardCopyOption.REPLACE_EXISTING);
 					LOGGER.debug("Copied additional file to {}", destination.toString());
 				}else {
 					LOGGER.debug("Skipped writing additional file {}", destination.toString());

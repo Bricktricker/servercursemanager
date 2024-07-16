@@ -211,7 +211,7 @@ public class ServerSideHandler extends SideHandler {
 				String modName = sourcePath.getFileName().toString();
 				
 				if(!Files.isRegularFile(sourcePath) || !Files.exists(sourcePath)) {
-					LOGGER.error("mod path {} does not point to a file", modPath);
+					LOGGER.error("Mod path {} does not point to a file", modPath);
 					continue;
 				}
 				

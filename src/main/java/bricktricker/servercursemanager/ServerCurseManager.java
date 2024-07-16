@@ -1,5 +1,6 @@
 package bricktricker.servercursemanager;
 
+import java.io.IOException;
 import java.net.URI;
 import java.net.URL;
 import java.nio.file.FileSystem;
@@ -14,6 +15,7 @@ import java.util.Map;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
+import org.apache.commons.lang3.exception.UncheckedException;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -101,9 +103,12 @@ public class ServerCurseManager implements IModLocator {
         URI targetURI = LamdbaExceptionUtils.uncheck(() -> new URI("file://" + LamdbaExceptionUtils.uncheck(url::toURI).getRawSchemeSpecificPart().split("!")[0].split("\\.jar")[0] + ".jar"));
 
         LOGGER.info("Unpacking utility mod from: " + targetURI.toString());
-		final FileSystem thiszip = LamdbaExceptionUtils.uncheck(() -> FileSystems.newFileSystem(Paths.get(targetURI), getClass().getClassLoader()));
-		final Path utilModPath = thiszip.getPath("utilmod", "serverpackutility.zip");
-		LamdbaExceptionUtils.uncheck(() -> Files.copy(utilModPath, serverModsPath.resolve("serverpackutility.jar"), StandardCopyOption.REPLACE_EXISTING));
+        try(FileSystem thiszip = FileSystems.newFileSystem(Paths.get(targetURI), getClass().getClassLoader())) {
+            final Path utilModPath = thiszip.getPath("utilmod", "serverpackutility.zip");
+            Files.copy(utilModPath, serverModsPath.resolve("serverpackutility.jar"), StandardCopyOption.REPLACE_EXISTING);
+        }catch(IOException e) {
+            throw new UncheckedException(e);
+        }
 	}
 
 	@Override
