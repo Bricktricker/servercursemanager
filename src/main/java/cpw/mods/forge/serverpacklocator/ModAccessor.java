@@ -1,10 +1,14 @@
 package cpw.mods.forge.serverpacklocator;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
+
+import org.apache.commons.lang3.tuple.Pair;
 
 /**
  * Copied from https://github.com/cpw/serverpacklocator/blob/4496cf9ba45515b286bde1a3a79513e75b69754e/src/main/java/cpw/mods/forge/serverpacklocator/ModAccessor.java
@@ -16,6 +20,9 @@ public class ModAccessor {
     private static Function<UUID, CompletableFuture<Boolean>> isWhiteListed = null;
     private static Supplier<CompletableFuture<Boolean>> isWhiteListEnabled = null;
     private static Function<UUID, CompletableFuture<Optional<String>>> nameResolver = null;
+    
+    private static List<Pair<String, Boolean>> clientPacks;
+    public static Consumer<List<Pair<String, Boolean>>> clientPackSelectionConsumer; 
 
     public static void setStatusLine(final String statusLine)
     {
@@ -57,5 +64,18 @@ public class ModAccessor {
             return id.toString();
         }
         return nameResolver.apply(id).join().orElseGet(id::toString);
+    }
+    
+    public static List<Pair<String, Boolean>> getClientPacks() {
+        return clientPacks;
+    }
+    
+    public static void setClientpacks(List<Pair<String, Boolean>> packs) {
+        clientPacks = packs;
+    }
+    
+    public static void savePacksSelection(List<Pair<String, Boolean>> packs) {
+        clientPackSelectionConsumer.accept(packs);
+        clientPacks = packs;
     }
 }

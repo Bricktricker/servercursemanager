@@ -21,11 +21,13 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 import net.minecraft.client.gui.screens.TitleScreen;
+import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.RenderGuiEvent;
 import net.minecraftforge.client.event.ScreenEvent;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.server.ServerStartedEvent;
 import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.DistExecutor;
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import net.minecraftforge.fml.loading.FMLEnvironment.Keys;
@@ -35,11 +37,14 @@ import org.apache.logging.log4j.Logger;
 @Mod("serverpacklocatorutility")
 public class UtilityMod {
 
-    private static final Logger LOGGER = LogManager.getLogger();
+    public static final Logger LOGGER = LogManager.getLogger();
 
     public UtilityMod() {
         FMLJavaModLoadingContext.get().getModEventBus().addListener(this::onClient);
         MinecraftForge.EVENT_BUS.addListener(this::onServerStart);
+        DistExecutor.safeRunWhenOn(Dist.CLIENT, () -> () -> {
+            MinecraftForge.registerConfigScreen(ConfigScreen::new);
+        });
     }
 
     private void onClient(FMLClientSetupEvent event) {

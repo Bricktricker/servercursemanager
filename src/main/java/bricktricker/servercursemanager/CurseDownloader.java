@@ -2,6 +2,8 @@ package bricktricker.servercursemanager;
 
 import java.io.IOException;
 import java.net.URL;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -21,6 +23,7 @@ public class CurseDownloader {
 		}
 
 		String filename = downloadURL.substring(lastSlash + 1).replaceAll("\\s+", "_");
+		filename = URLDecoder.decode(filename, StandardCharsets.UTF_8);
 
 		Path target = targetDir.resolve(filename);
 

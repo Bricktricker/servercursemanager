@@ -117,22 +117,65 @@ public class ServerSideHandler extends SideHandler {
 			}
 		}
 		
-		// get all downloaded mods, add the to the 'manifestMods' list
-		for(var future : modResultFutures) {
-		    ModHandler.ModResult result = future.join();
-			if(result == null) {
-				continue;
-			}
-			
-			if(result.loadOnServer()) {
-			    this.loadedModNames.add(result.modName());   
-			}
-			
-			var manifestData = result.manifestData();
-			if(manifestData != null) {
-			    manifestMods.add(manifestData);   
-			}
+		// Additional client mods:
+		JsonArray clientPacksManifest = new JsonArray();
+		if(packConfig.has(SideHandler.CLIENT_PACKS)) {
+		    JsonArray clientPacks = packConfig.getAsJsonArray(SideHandler.CLIENT_PACKS);
+		    for(JsonElement packE : clientPacks) {
+		        JsonObject clientPack = packE.getAsJsonObject();
+		        
+		        String name = clientPack.getAsJsonPrimitive("name").getAsString();
+		        JsonArray clientMods = clientPack.getAsJsonArray("mods");
+		        
+		        JsonObject clientPackManifest = new JsonObject();
+		        clientPackManifest.addProperty("name", name);
+		        
+		        final List<CompletableFuture<ModHandler.ModResult>> clientResultFutures = new ArrayList<>();
+		        
+		        for(JsonElement modE : clientMods) {
+		            JsonObject clientMod = modE.getAsJsonObject();
+		            clientMod.addProperty("side", "client"); // Force only loading on client
+		            
+		            final String source = clientMod.getAsJsonPrimitive("source").getAsString();
+		            if("curse".equalsIgnoreCase(source)) {
+		                clientResultFutures.add(curseModHandler.handleMod(clientMod, zos));
+		            }else if("local".equals(source)) {
+		                clientResultFutures.add(localModHandler.handleMod(clientMod, zos));
+		            }else {
+		                LOGGER.error("Unkown source {} for a mod", source);
+		            }
+		        }
+		        
+		        JsonArray clientManifestMods = new JsonArray(clientResultFutures.size());
+		        for(var future : clientResultFutures) {
+		            ModHandler.ModResult result = future.join();
+		            if(result == null) {
+		                continue;
+		            }
+		            clientManifestMods.add(result.manifestData());
+		        }
+		        clientPackManifest.add("mods", clientManifestMods);
+		        clientPacksManifest.add(clientPackManifest);
+		    }
+		    
 		}
+		
+		// get all downloaded mods, add the to the 'manifestMods' list
+        for(var future : modResultFutures) {
+            ModHandler.ModResult result = future.join();
+            if(result == null) {
+                continue;
+            }
+            
+            if(result.loadOnServer()) {
+                this.loadedModNames.add(result.modName());   
+            }
+            
+            var manifestData = result.manifestData();
+            if(manifestData != null) {
+                manifestMods.add(manifestData);   
+            }
+        }
 
 		// gather aditional files
 		JsonArray manifestAdditional = new JsonArray();
@@ -225,6 +268,7 @@ public class ServerSideHandler extends SideHandler {
 		JsonObject manifest = new JsonObject();
 		manifest.add(SideHandler.MODS, manifestMods);
 		manifest.add(SideHandler.ADDITIONAL, manifestAdditional);
+		manifest.add(SideHandler.CLIENT_PACKS, clientPacksManifest);
 
 		try {
 			ZipEntry manifestEntry = Utils.getStableEntry("manifest.json");

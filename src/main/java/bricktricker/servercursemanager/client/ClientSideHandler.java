@@ -1,6 +1,7 @@
 package bricktricker.servercursemanager.client;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
@@ -14,6 +15,8 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.commons.lang3.tuple.Pair;
+
 import com.electronwill.nightconfig.core.file.CommentedFileConfig;
 import com.electronwill.nightconfig.core.file.FileConfig;
 import com.electronwill.nightconfig.core.file.FileNotFoundAction;
@@ -26,6 +29,7 @@ import bricktricker.servercursemanager.CurseDownloader;
 import bricktricker.servercursemanager.SideHandler;
 import bricktricker.servercursemanager.Utils;
 import cpw.mods.forge.serverpacklocator.LaunchEnvironmentHandler;
+import cpw.mods.forge.serverpacklocator.ModAccessor;
 
 public class ClientSideHandler extends SideHandler {
 
@@ -45,12 +49,20 @@ public class ClientSideHandler extends SideHandler {
 				.build();
 
 		this.packConfig.load();
-		this.packConfig.close();
+		
+		ModAccessor.clientPackSelectionConsumer = this::handleClientPackSelection;
 	}
 
 	@Override
 	protected String getConfigFile() {
 		return "/defaultclientconfig.toml";
+	}
+	
+	private void handleClientPackSelection(List<Pair<String, Boolean>> selection) {
+	    for(var pack : selection) {
+	        this.packConfig.set("packs." + pack.getLeft(), pack.getRight());
+	    }
+	    this.packConfig.save();
 	}
 
 	@Override
@@ -108,7 +120,7 @@ public class ClientSideHandler extends SideHandler {
 			return;
 		}
 
-		final List<CompletableFuture<String>> futures = new ArrayList<>();
+		List<CompletableFuture<String>> futures = new ArrayList<>();
 
 		try(FileSystem modpackSystem = FileSystems.newFileSystem(modpackZip)) {
 		    Path manifestPath = modpackSystem.getPath("manifest.json");
@@ -118,34 +130,7 @@ public class ClientSideHandler extends SideHandler {
 			int numDownloadThreads = Math.min(Math.max(Runtime.getRuntime().availableProcessors() / 2, 1), mods.size());
 			this.downloadThreadpool = new ThreadPoolExecutor(1, numDownloadThreads, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<Runnable>());
 			
-			for(JsonElement modE : mods) {
-				JsonObject mod = modE.getAsJsonObject();
-				final String source = mod.getAsJsonPrimitive("source").getAsString();
-				if("remote".equals(source)) {
-					String url = mod.getAsJsonPrimitive("url").getAsString();
-					String sha1 = mod.getAsJsonPrimitive("sha1").getAsString();
-					String fileName = mod.getAsJsonPrimitive("file").getAsString();
-
-					CompletableFuture<String> future = CompletableFuture.supplyAsync(() -> {
-						try {
-							CurseDownloader.downloadFile(url, fileName, sha1, getServermodsFolder());
-							this.loadedModNames.add(fileName);
-							return fileName;
-						}catch(IOException e) {
-							LOGGER.catching(e);
-							return null;
-						}
-					}, downloadThreadpool);
-
-					futures.add(future);
-
-				}else if("local".equals(source)) {
-					String filename = mod.getAsJsonPrimitive("file").getAsString();
-					Path modEntryPath = modpackSystem.getPath("mods", filename);
-					Files.copy(modEntryPath, getServermodsFolder().resolve(filename), StandardCopyOption.REPLACE_EXISTING);
-					this.loadedModNames.add(filename);
-				}
-			}
+			futures = this.parseMods(modpackSystem, mods);
 
 			JsonArray additional = manifest.getAsJsonArray(SideHandler.ADDITIONAL);
 			for(JsonElement fileE : additional) {
@@ -161,13 +146,77 @@ public class ClientSideHandler extends SideHandler {
 					LOGGER.debug("Skipped writing additional file {}", destination.toString());
 				}
 			}
+			
+			var clientPacksList = new ArrayList<Pair<String, Boolean>>();
+			JsonArray clientPacks = manifest.getAsJsonArray(SideHandler.CLIENT_PACKS);
+			for(JsonElement packE : clientPacks) {
+			    JsonObject pack = packE.getAsJsonObject();
+			    String name = pack.getAsJsonPrimitive("name").getAsString();
+			    
+			    if(!this.packConfig.contains("packs." + name)) {
+			        LOGGER.debug("adding config path {}", "packs." + name);
+			        this.packConfig.add("packs." + name, false);
+		             var pair = Pair.<String, Boolean>of(name, false);
+		             clientPacksList.add(pair);
+			    }else {
+			        boolean enable = this.packConfig.<Boolean>get("packs." + name);
+		            var pair = Pair.<String, Boolean>of(name, enable);
+		            clientPacksList.add(pair);
+			        if(!enable) {
+			            continue;
+			        }
+			        
+			        var clientPackFutures = this.parseMods(modpackSystem, pack.getAsJsonArray("mods"));
+			        futures.addAll(clientPackFutures);
+			    }
+			}
+			ModAccessor.setClientpacks(clientPacksList);
+			this.packConfig.save();
 
 			this.installTask = CompletableFuture.allOf(futures.toArray(CompletableFuture[]::new));
 
-		}catch(IOException e) {
+		}catch(Exception e) {
 			LOGGER.catching(e);
 			this.status = "Exception while loading modpack";
 		}
+	}
+	
+	private List<CompletableFuture<String>> parseMods(FileSystem modpackSystem, JsonArray mods) {
+	    final List<CompletableFuture<String>> futures = new ArrayList<>();
+	    for(JsonElement modE : mods) {
+            JsonObject mod = modE.getAsJsonObject();
+            final String source = mod.getAsJsonPrimitive("source").getAsString();
+            if("remote".equals(source)) {
+                String url = mod.getAsJsonPrimitive("url").getAsString();
+                String sha1 = mod.getAsJsonPrimitive("sha1").getAsString();
+                String fileName = mod.getAsJsonPrimitive("file").getAsString();
+
+                CompletableFuture<String> future = CompletableFuture.supplyAsync(() -> {
+                    try {
+                        CurseDownloader.downloadFile(url, fileName, sha1, getServermodsFolder());
+                        this.loadedModNames.add(fileName);
+                        return fileName;
+                    }catch(IOException e) {
+                        LOGGER.catching(e);
+                        return null;
+                    }
+                }, downloadThreadpool);
+
+                futures.add(future);
+
+            }else if("local".equals(source)) {
+                String filename = mod.getAsJsonPrimitive("file").getAsString();
+                Path modEntryPath = modpackSystem.getPath("mods", filename);
+                try {
+                    Files.copy(modEntryPath, getServermodsFolder().resolve(filename), StandardCopyOption.REPLACE_EXISTING);
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+                this.loadedModNames.add(filename);
+            }
+        }
+	    
+	    return futures;
 	}
 
 	public String getRemoteServer() {

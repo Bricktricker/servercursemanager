@@ -16,6 +16,7 @@ public abstract class SideHandler {
 	protected static final Logger LOGGER = LogManager.getLogger();
 	protected static final String ADDITIONAL = "additional";
 	protected static final String MODS = "mods";
+	protected static final String CLIENT_PACKS = "clientPacks";
 
 	protected final Path serverModsPath;
 	protected Path serverpackFolder;

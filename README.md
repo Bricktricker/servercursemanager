@@ -9,7 +9,7 @@ Simply put the jar file into the `mods` folder of your MinecraftForge server. Th
 ### Config
 Server Curse Manager adds two new folders to your MineraftForge server: `serverpack` and `servermods`. `Servermods` is managed by the program and stores all downloaded mods. The `serverpack` folder contains the configuration files for the Server Curse Manager.
 
-After the first start you should have a `pack.json` file in your `serverpack` folder to configer the loaded mods. This JSON file contains 3 main entries:
+After the first start you should have a `pack.json` file in your `serverpack` folder to configer the loaded mods. This JSON file contains 5 main entries:
 
 1. `port`: The port that Server Curse Manager should use to listen for clients that want to download the modpack
 2. `mods`: This is an array that list all mods you want to load on the server and all clients. Every mod is a JSON object with at least 2 values: 
@@ -22,6 +22,7 @@ After the first start you should have a `pack.json` file in your `serverpack` fo
 	1. `file`: The path to the file or folder you want to sync, relative to the  MinecraftForge root folder.
 	2. `target`: Where the file or folder should be placed on the client relative to the current game folder (This is either the `.minecraft` folder or the folder specified fo the current profile).
 4. `copyOption`: Can either be `overwrite` or `keep`, defaults to `keep`. This specifies how to deal with additional files, if they are already present on the client. You can also specify this for individual files.
+5. `clientPacks`: Allos you to create additional client only modpacks. User can enable them in the "Serverpack utility mod" config screen.
 
 Make sure to restart the server after chainging the config file.
 
@@ -57,6 +58,23 @@ Make sure to restart the server after chainging the config file.
             "source": "local",
             "mod": "serverpack/myMod.jar",
             "name": "MyMod"
+        }
+    ],
+    "clientPacks": [
+        {
+            "name": "Shader!",
+            "mods": [
+                {
+                    "source": "curse",
+                    "projectID": 908741,
+                    "fileID": 5521846
+                },
+                {
+                    "source": "curse",
+                    "projectID": 581495,
+                    "fileID": 5299671
+                }
+            ]
         }
     ]
 }
