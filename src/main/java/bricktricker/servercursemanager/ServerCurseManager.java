@@ -54,6 +54,13 @@ public class ServerCurseManager implements IModLocator {
 		this.sideHandler.waitForInstall();
 		final List<ModFileOrException> modFiles = dirLocator.scanMods();
 		final ModFileOrException packutil = modFiles.stream()
+		        .filter(modFile -> {
+		            if(modFile.ex() != null) {
+		                LOGGER.catching(modFile.ex());
+		                return false;
+		            }
+		            return true;
+		        })
 				.filter(modFile -> "serverpackutility.jar".equals(modFile.file().getFileName()))
 				.findFirst()
 				.orElseThrow(() -> new RuntimeException("Something went wrong with the internal utility mod"));

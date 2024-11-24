@@ -1,6 +1,5 @@
 package bricktricker.servercursemanager.server.modhandler;
 
-import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -56,20 +55,21 @@ public class CurseModHandler extends ModHandler {
     public CompletableFuture<ModResult> handleMod(JsonObject mod, ZipOutputStream zos) {
         int projectID = mod.getAsJsonPrimitive("projectID").getAsInt();
         int fileID = mod.getAsJsonPrimitive("fileID").getAsInt();
-        
+
         var future = this.getMapping(projectID, fileID)
             .map(CompletableFuture::completedFuture)
-            .orElseGet(() -> CompletableFuture.supplyAsync(() -> {
-                try {
-                    LOGGER.debug("Downloading curse file {} for project {}", fileID, projectID);
-                    ModMapping m = CurseDownloader.downloadMod(projectID, fileID, serverModsPath);
-                    this.addMapping(m);
-                    return m;
-                }catch(IOException e) {
-                    LOGGER.catching(e);
-                    return null;
-                }
-            }, this.threadPool));
+            .orElseGet(() -> {
+                LOGGER.debug("Downloading curse file {} for project {}", fileID, projectID);
+                return CurseDownloader.downloadMod(projectID, fileID, serverModsPath, this.threadPool);
+            })
+            .thenApply(m -> {
+                this.addMapping(m);
+                return m;
+            })
+            .exceptionally(e -> {
+                LOGGER.catching(e);
+                return null;
+            });
         
         var res = future.thenApply(mapping -> {
             if(mapping == null) {
