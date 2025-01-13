@@ -8,9 +8,8 @@ package cpw.mods.forge.serverpackutility;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableList.Builder;
 import com.mojang.authlib.GameProfile;
-import cpw.mods.modlauncher.Launcher;
-import cpw.mods.modlauncher.api.LamdbaExceptionUtils;
-import cpw.mods.modlauncher.api.TypesafeMap.Key;
+import cpw.mods.modlauncher.api.IEnvironment.Keys;
+import cpw.mods.modlauncher.api.LambdaExceptionUtils;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.List;
@@ -21,16 +20,17 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 import net.minecraft.client.gui.screens.TitleScreen;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.client.event.RenderGuiEvent;
-import net.minecraftforge.client.event.ScreenEvent;
-import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.event.server.ServerStartedEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.DistExecutor;
-import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
-import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
-import net.minecraftforge.fml.loading.FMLEnvironment.Keys;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.bus.api.IEventBus;
+import net.neoforged.neoforge.client.event.RenderGuiEvent;
+import net.neoforged.neoforge.client.event.ScreenEvent;
+import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
+import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.event.server.ServerStartedEvent;
+import net.neoforged.fml.common.Mod;
+import net.neoforged.fml.loading.FMLLoader;
+import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
+import net.neoforged.fml.ModContainer;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -39,30 +39,41 @@ public class UtilityMod {
 
     public static final Logger LOGGER = LogManager.getLogger();
 
-    public UtilityMod() {
-        FMLJavaModLoadingContext.get().getModEventBus().addListener(this::onClient);
-        MinecraftForge.EVENT_BUS.addListener(this::onServerStart);
-        DistExecutor.safeRunWhenOn(Dist.CLIENT, () -> () -> {
-            MinecraftForge.registerConfigScreen(ConfigScreen::new);
-        });
+    public UtilityMod(IEventBus modEventBus, ModContainer modContainer) {
+        NeoForge.EVENT_BUS.addListener(this::onServerStart);
+
+        if(FMLLoader.getDist() == Dist.CLIENT) {
+            ClientWrapper.handleClient(modEventBus, modContainer);
+        }
     }
 
-    private void onClient(FMLClientSetupEvent event) {
-        MinecraftForge.EVENT_BUS.addListener(UtilityMod.Wrapper::onShowGui);
+    private static class ClientWrapper {
+        private static void handleClient(IEventBus modEventBus, ModContainer modContainer) {
+            modEventBus.addListener(ClientWrapper::onClient);
+
+            modContainer.registerExtensionPoint(
+                IConfigScreenFactory.class,
+                (mc, modsScreen) -> new ConfigScreen(modsScreen)
+            );
+        }
+
+        private static void onClient(FMLClientSetupEvent event) {
+            NeoForge.EVENT_BUS.addListener(UtilityMod.Wrapper::onShowGui);
+        }
     }
 
     private void onServerStart(ServerStartedEvent startedEvent) {
         try {
-            Optional<ClassLoader> classLoader = Launcher.INSTANCE.environment().getProperty((Key)Keys.LOCATORCLASSLOADER.get());
-            Class<?> clz = LamdbaExceptionUtils.uncheck(() -> Class.forName("cpw.mods.forge.serverpacklocator.ModAccessor", true, classLoader.orElse(Thread.currentThread().getContextClassLoader())));
-            Method setIsWhiteListed = LamdbaExceptionUtils.uncheck(() -> clz.getMethod("setIsWhiteListed", Function.class));
-            Method setIsWhiteListEnabled = LamdbaExceptionUtils.uncheck(() -> clz.getMethod("setIsWhiteListEnabled", Supplier.class));
-            Method setNameResolver = LamdbaExceptionUtils.uncheck(() -> clz.getMethod("setNameResolver", Function.class));
-            LamdbaExceptionUtils.uncheck(() -> setIsWhiteListed.invoke(null, (Function<UUID, CompletableFuture<Boolean>>)(id) -> startedEvent.getServer().submit(() -> {
+            ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+            Class<?> clz = LambdaExceptionUtils.uncheck(() -> Class.forName("cpw.mods.forge.serverpacklocator.ModAccessor", true, classLoader));
+            Method setIsWhiteListed = LambdaExceptionUtils.uncheck(() -> clz.getMethod("setIsWhiteListed", Function.class));
+            Method setIsWhiteListEnabled = LambdaExceptionUtils.uncheck(() -> clz.getMethod("setIsWhiteListEnabled", Supplier.class));
+            Method setNameResolver = LambdaExceptionUtils.uncheck(() -> clz.getMethod("setNameResolver", Function.class));
+            LambdaExceptionUtils.uncheck(() -> setIsWhiteListed.invoke(null, (Function<UUID, CompletableFuture<Boolean>>)(id) -> startedEvent.getServer().submit(() -> {
                 return startedEvent.getServer().getPlayerList().getWhiteList().isWhiteListed(new GameProfile(id, "")); //Name does not matter
             })));
-            LamdbaExceptionUtils.uncheck(() -> setIsWhiteListEnabled.invoke(null, (Supplier<CompletableFuture<Boolean>>)() -> startedEvent.getServer().submit(() -> startedEvent.getServer().getPlayerList().isUsingWhitelist())));
-            LamdbaExceptionUtils.uncheck(() -> setNameResolver.invoke(null, (Function<UUID, CompletableFuture<Optional<String>>>)(id) -> {
+            LambdaExceptionUtils.uncheck(() -> setIsWhiteListEnabled.invoke(null, (Supplier<CompletableFuture<Boolean>>)() -> startedEvent.getServer().submit(() -> startedEvent.getServer().getPlayerList().isUsingWhitelist())));
+            LambdaExceptionUtils.uncheck(() -> setNameResolver.invoke(null, (Function<UUID, CompletableFuture<Optional<String>>>)(id) -> {
                 return startedEvent.getServer().submit(() -> {
                     return startedEvent.getServer().getProfileCache().get(id).map(GameProfile::getName);
                 });
@@ -85,12 +96,12 @@ public class UtilityMod {
         static void onShowGui(ScreenEvent.Render.Pre event) {
             if (!brandingHacked) {
                 if (event.getScreen() instanceof TitleScreen) {
-                    List<String> branding = (List<String>) LamdbaExceptionUtils.uncheck(() -> (List)brandingList.get(null));
+                    List<String> branding = (List<String>) LambdaExceptionUtils.uncheck(() -> (List)brandingList.get(null));
                     if (branding != null) {
                         Builder<String> brd = ImmutableList.builder();
                         brd.addAll(branding);
                         brd.add(statusMessage.get());
-                        LamdbaExceptionUtils.uncheck(() -> brandingList.set(null, brd.build()));
+                        LambdaExceptionUtils.uncheck(() -> brandingList.set(null, brd.build()));
                         brandingHacked = true;
                     }
 
@@ -99,16 +110,16 @@ public class UtilityMod {
         }
 
         static {
-            Class<?> brdControl = LamdbaExceptionUtils.uncheck(() -> Class.forName("net.minecraftforge.internal.BrandingControl", true, Thread.currentThread().getContextClassLoader()));
-            brandingList = LamdbaExceptionUtils.uncheck(() -> brdControl.getDeclaredField("overCopyrightBrandings"));
+            Class<?> brdControl = LambdaExceptionUtils.uncheck(() -> Class.forName("net.neoforged.neoforge.internal.BrandingControl", true, Thread.currentThread().getContextClassLoader()));
+            brandingList = LambdaExceptionUtils.uncheck(() -> brdControl.getDeclaredField("overCopyrightBrandings"));
             brandingList.setAccessible(true);
 
             Supplier<String> statMessage;
             try {
-                Optional<ClassLoader> classLoader = Launcher.INSTANCE.environment().getProperty((Key)Keys.LOCATORCLASSLOADER.get());
-                Class<?> clz = LamdbaExceptionUtils.uncheck(() -> Class.forName("cpw.mods.forge.serverpacklocator.ModAccessor", true, classLoader.orElse(Thread.currentThread().getContextClassLoader())));
-                Method status = LamdbaExceptionUtils.uncheck(() -> clz.getMethod("getStatusLine"));
-                statMessage = () -> LamdbaExceptionUtils.uncheck(() -> (String)status.invoke(null));
+                ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+                Class<?> clz = LambdaExceptionUtils.uncheck(() -> Class.forName("cpw.mods.forge.serverpacklocator.ModAccessor", true, classLoader));
+                Method status = LambdaExceptionUtils.uncheck(() -> clz.getMethod("getStatusLine"));
+                statMessage = () -> LambdaExceptionUtils.uncheck(() -> (String)status.invoke(null));
             } catch (Throwable var5) {
                 LogManager.getLogger().catching(var5);
                 statMessage = () -> "ServerPack: FAILED TO LOAD STATUS";

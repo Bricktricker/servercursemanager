@@ -92,7 +92,13 @@ public class CurseDownloader {
     public static void downloadFile(String downloadURL, String filename, String sha1, Path targetDir) throws IOException {
         Path target = targetDir.resolve(filename);
         if (!Files.exists(target)) {
-            URL url = new URL(downloadURL);
+            URL url;
+            try {
+                URI uri = new URI(downloadURL);
+                url = uri.toURL();
+            } catch (URISyntaxException e) {
+                throw new IOException(e);
+            }
             Files.copy(url.openStream(), target, StandardCopyOption.REPLACE_EXISTING);
         }
 

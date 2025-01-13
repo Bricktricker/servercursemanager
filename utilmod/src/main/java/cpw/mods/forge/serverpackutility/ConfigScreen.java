@@ -1,7 +1,7 @@
 package cpw.mods.forge.serverpackutility;
 
 import cpw.mods.modlauncher.Launcher;
-import cpw.mods.modlauncher.api.LamdbaExceptionUtils;
+import cpw.mods.modlauncher.api.LambdaExceptionUtils;
 import cpw.mods.modlauncher.api.TypesafeMap.Key;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -14,7 +14,6 @@ import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.Checkbox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
-import net.minecraftforge.fml.loading.FMLEnvironment.Keys;
 
 import org.apache.commons.lang3.tuple.Pair;
 
@@ -57,8 +56,11 @@ public class ConfigScreen extends Screen {
         int height = 30;
         for(int i = 0; i < packs.size(); i++) {
             var pack = packs.get(i);
-            Checkbox box = new Checkbox(40, height, 20, 20, Component.literal(pack.getLeft()), pack.getRight()); // 1.20.1
-            //Checkbox box = Checkbox.builder(Component.literal(pack.getLeft()), font).pos(40, height).build() // 1.21
+            Checkbox box = Checkbox.builder(Component.literal(pack.getLeft()), this.font)
+                .selected(pack.getRight())
+                .pos(40, height)
+                .build();
+            //Checkbox box = new Checkbox(40, height, 20, 20, Component.literal(pack.getLeft()), pack.getRight()); // 1.20.1
             addRenderableWidget(box);
             this.checkboxs.add(box);
             height += 25;
@@ -67,7 +69,7 @@ public class ConfigScreen extends Screen {
     
     @Override
     public void render(GuiGraphics pGuiGraphics, int pMouseX, int pMouseY, float pPartialTick) {
-        renderBackground(pGuiGraphics);
+        //renderBackground(pGuiGraphics);
         super.render(pGuiGraphics, pMouseX, pMouseY, pPartialTick);
         pGuiGraphics.drawCenteredString(this.font, this.title, this.width / 2, 17, -1);
     }
@@ -76,23 +78,23 @@ public class ConfigScreen extends Screen {
     private static Method savePacksSelection = null;
     static {
         try {
-            Optional<ClassLoader> classLoader = Launcher.INSTANCE.environment().getProperty((Key)Keys.LOCATORCLASSLOADER.get());
-            Class<?> modAccessor = LamdbaExceptionUtils.uncheck(() -> Class.forName("cpw.mods.forge.serverpacklocator.ModAccessor", true, classLoader.orElse(Thread.currentThread().getContextClassLoader())));
+            ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+            Class<?> modAccessor = LambdaExceptionUtils.uncheck(() -> Class.forName("cpw.mods.forge.serverpacklocator.ModAccessor", true, classLoader));
 
-            getClientPacks = LamdbaExceptionUtils.uncheck(() -> modAccessor.getMethod("getClientPacks"));
-            savePacksSelection = LamdbaExceptionUtils.uncheck(() -> modAccessor.getMethod("savePacksSelection", List.class));
+            getClientPacks = LambdaExceptionUtils.uncheck(() -> modAccessor.getMethod("getClientPacks"));
+            savePacksSelection = LambdaExceptionUtils.uncheck(() -> modAccessor.getMethod("savePacksSelection", List.class));
         } catch (Throwable error) {
             UtilityMod.LOGGER.error("Failed to fetch client packs!", error);
         }
     }
 
     private static List<Pair<String, Boolean>> getClientPacks() {
-        var clientPacksObj = LamdbaExceptionUtils.uncheck(() -> getClientPacks.invoke(null));
+        var clientPacksObj = LambdaExceptionUtils.uncheck(() -> getClientPacks.invoke(null));
         return (List<Pair<String, Boolean>>)clientPacksObj;
     }
 
     private static void savePacksSelection(List<Pair<String, Boolean>> checked) {
-        LamdbaExceptionUtils.uncheck(() -> savePacksSelection.invoke(null, checked));
+        LambdaExceptionUtils.uncheck(() -> savePacksSelection.invoke(null, checked));
     }
 
 }

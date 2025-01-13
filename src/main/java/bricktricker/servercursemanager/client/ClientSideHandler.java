@@ -20,6 +20,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import com.electronwill.nightconfig.core.file.CommentedFileConfig;
 import com.electronwill.nightconfig.core.file.FileConfig;
 import com.electronwill.nightconfig.core.file.FileNotFoundAction;
+import com.electronwill.nightconfig.core.io.WritingMode;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -46,6 +47,8 @@ public class ClientSideHandler extends SideHandler {
 		this.packConfig = CommentedFileConfig.builder(serverpackFolder.resolve("config.toml"))
 				.preserveInsertionOrder()
 				.onFileNotFound(FileNotFoundAction.copyData(ClientSideHandler.class.getResourceAsStream(this.getConfigFile())))
+				.writingMode(WritingMode.REPLACE)
+				.sync()
 				.build();
 
 		this.packConfig.load();

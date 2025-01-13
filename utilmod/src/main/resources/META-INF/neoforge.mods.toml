@@ -1,9 +1,9 @@
 modLoader="javafml" #mandatory
-loaderVersion="[43,)" #mandatory (28 is current forge version)
+loaderVersion="[4,)" #mandatory
 license="LGPL v3"
 [[mods]] #mandatory
 modId="serverpacklocatorutility" #mandatory
-version="${file.jarVersion}" #mandatory
+version="1.0.0" #mandatory
 displayName="Server Pack Locator Utility mod" #mandatory
 credits="cpw" #optional
 authors="cpw" #optional

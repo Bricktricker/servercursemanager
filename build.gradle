@@ -6,14 +6,14 @@ plugins {
 
 group = 'bricktricker'
 version = '1.5.1'
-java.toolchain.languageVersion = JavaLanguageVersion.of(17)
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
 
 repositories {
     mavenLocal()
     mavenCentral()
     maven {
-        name = 'forge'
-        url = 'https://maven.minecraftforge.net'
+        name = 'NeoForge'
+        url = 'https://maven.neoforged.net/releases'
     }
     maven {
         name = "mojang"
@@ -56,12 +56,12 @@ task distributionJar(type: Jar) {
 
 
 dependencies {
-    implementation('cpw.mods:modlauncher:10.0.9')
-    implementation('net.minecraftforge:forgespi:7.1.5')
-    implementation('com.electronwill.night-config:core:3.7.3')
-    implementation('com.electronwill.night-config:toml:3.7.3')
+    implementation('cpw.mods:modlauncher:11.0.4')
+    implementation('net.neoforged.fancymodloader:loader:4.0.34')
+    implementation('com.electronwill.night-config:core:3.8.0')
+    implementation('com.electronwill.night-config:toml:3.8.0')
     implementation('com.google.code.gson:gson:2.10.1')
-    implementation("com.mojang:authlib:6.0.55")
+    implementation("com.mojang:authlib:6.0.54")
 
     implementation('io.netty:netty-common:4.1.97.Final')
     implementation('io.netty:netty-buffer:4.1.97.Final')
