@@ -57,7 +57,7 @@ task distributionJar(type: Jar) {
 
 dependencies {
     implementation('cpw.mods:modlauncher:11.0.4')
-    implementation('net.neoforged.fancymodloader:loader:4.0.34')
+    implementation('net.neoforged.fancymodloader:loader:4.0.38')
     implementation('com.electronwill.night-config:core:3.8.0')
     implementation('com.electronwill.night-config:toml:3.8.0')
     implementation('com.google.code.gson:gson:2.10.1')

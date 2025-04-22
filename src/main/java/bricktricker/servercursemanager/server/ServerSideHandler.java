@@ -213,7 +213,7 @@ public class ServerSideHandler extends SideHandler {
 				JsonObject additionalFile = fileE.getAsJsonObject();
 
 				String file = additionalFile.getAsJsonPrimitive("file").getAsString();
-				String target = additionalFile.getAsJsonPrimitive("target").getAsString();
+				final String target = additionalFile.getAsJsonPrimitive("target").getAsString();
 				CopyOption copyOption = additionalFile.has("copyOption") ? CopyOption.getOption(additionalFile.getAsJsonPrimitive("copyOption").getAsString()) : globalCopyOption;
 
 				Path filePath = Paths.get(file);
@@ -256,7 +256,12 @@ public class ServerSideHandler extends SideHandler {
 					}
 
 				}else {
-					fileAdder.accept(filePath, target, copyOption);
+				    String writeTarget = target;
+				    if(writeTarget.endsWith("/")) {
+				        writeTarget = writeTarget + filePath.getFileName().toString();
+				    }
+				    
+					fileAdder.accept(filePath, writeTarget, copyOption);
 				}
 			}
 		}
