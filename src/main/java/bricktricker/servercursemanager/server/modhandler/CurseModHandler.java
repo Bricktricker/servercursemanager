@@ -10,6 +10,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.stream.StreamSupport;
 import java.util.zip.ZipOutputStream;
 
+import org.apache.commons.lang3.exception.UncheckedException;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -68,7 +69,7 @@ public class CurseModHandler extends ModHandler {
             })
             .exceptionally(e -> {
                 LOGGER.catching(e);
-                return null;
+                throw new UncheckedException(e);
             });
         
         var res = future.thenApply(mapping -> {

@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -162,7 +163,16 @@ public class ServerSideHandler extends SideHandler {
 		
 		// get all downloaded mods, add the to the 'manifestMods' list
         for(var future : modResultFutures) {
-            ModHandler.ModResult result = future.join();
+            ModHandler.ModResult result;
+            try {
+                result = future.join(); // Throws a CompletionException, without detailed cause
+            }catch(CompletionException e) {
+                // Failed to load a mod, stop trying
+                LOGGER.catching(e);
+                curseModHandler.close();
+                localModHandler.close();
+                return;
+            }
             if(result == null) {
                 continue;
             }

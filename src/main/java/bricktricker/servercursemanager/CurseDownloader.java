@@ -37,12 +37,12 @@ public class CurseDownloader {
         }
 
         var httpClient = HttpClient.newBuilder()
-                .connectTimeout(Duration.of(10, ChronoUnit.SECONDS))
+                .connectTimeout(Duration.of(30, ChronoUnit.SECONDS))
                 .followRedirects(Redirect.NORMAL)
                 .executor(executor)
                 .build();
 
-        var httpRequest = HttpRequest.newBuilder(url).GET().timeout(Duration.of(10, ChronoUnit.SECONDS)).build();
+        var httpRequest = HttpRequest.newBuilder(url).GET().timeout(Duration.of(30, ChronoUnit.SECONDS)).build();
 
         var reqFuture = httpClient.sendAsync(httpRequest, BodyHandlers.ofString())
                 .thenApply(r -> JsonParser.parseString(r.body()))
@@ -71,7 +71,7 @@ public class CurseDownloader {
                         throw new RuntimeException(e);
                     }
 
-                    var fileReq = HttpRequest.newBuilder(fileUri).GET().timeout(Duration.of(10, ChronoUnit.SECONDS))
+                    var fileReq = HttpRequest.newBuilder(fileUri).GET().timeout(Duration.of(60, ChronoUnit.SECONDS))
                             .build();
 
                     return httpClient.sendAsync(fileReq,
