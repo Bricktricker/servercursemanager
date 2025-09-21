@@ -171,7 +171,7 @@ public class ServerSideHandler extends SideHandler {
                 LOGGER.catching(e);
                 curseModHandler.close();
                 localModHandler.close();
-                return;
+                throw e;
             }
             if(result == null) {
                 continue;
