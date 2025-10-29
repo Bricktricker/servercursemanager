@@ -81,7 +81,7 @@ Make sure to restart the server after chainging the config file.
 ```
 
 ### Authentication
-Server Curse Manager uses the newly added key pairs every Mojang account has to validate the used player UUID that is used to request the modpack. If you only want to allow specific players to download the modpack, you can simply enable the white-list on the server and add all trusted users to it. Server Curse Manager  automatically checks for the enable white-list and only allows players that are on the white-list to download the modpack.
+Server Curse Manager uses the newly added key pairs every Mojang account has to validate the used player UUID that is used to request the modpack. If you only want to allow specific players to download the modpack, you can simply enable the white-list on the server and add all trusted users to it. Server Curse Manager automatically checks for the enable white-list and only allows players that are on the white-list to download the modpack.
 
 ## Client
 ### Install

@@ -94,7 +94,7 @@ public class ClientSideHandler extends SideHandler {
 		super.initialize();
 
 		final Path modpackZip = this.getServerpackFolder().resolve("modpack.zip");
-		byte[] currentModpackHash = null;
+		byte[] currentModpackHash = new byte[0];
 		if(Files.exists(modpackZip) && Files.isRegularFile(modpackZip)) {
 			currentModpackHash = Utils.computeSha1(modpackZip);
 		}
@@ -130,7 +130,7 @@ public class ClientSideHandler extends SideHandler {
 			JsonObject manifest = Utils.loadJson(Files.newInputStream(manifestPath)).getAsJsonObject();
 
 			JsonArray mods = manifest.getAsJsonArray(SideHandler.MODS);
-			int numDownloadThreads = Math.min(Math.max(Runtime.getRuntime().availableProcessors() / 2, 1), mods.size());
+			int numDownloadThreads = Math.min(Math.max(Runtime.getRuntime().availableProcessors() / 2, 1), Math.max(mods.size(), 1));
 			this.downloadThreadpool = new ThreadPoolExecutor(1, numDownloadThreads, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<Runnable>());
 			
 			futures = this.parseMods(modpackSystem, mods);

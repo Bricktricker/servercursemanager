@@ -127,7 +127,7 @@ public final class ProfileKeyPairBasedSecurityManager
         return apiService.getKeyPair();
     }
 
-    private static ProfileKeyPair getProfileKeyPair() {
+    public static ProfileKeyPair getProfileKeyPair() {
         final KeyPairResponse keyPairResponse = getKeyPair();
         if (keyPairResponse == null)
             return null;
