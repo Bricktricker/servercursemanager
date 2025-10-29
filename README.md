@@ -1,6 +1,8 @@
 # Server Curse Manager
 A feature extension of [cpw/serverpacklocator](https://github.com/cpw/serverpacklocator/).
-This project allows a MinecraftForge server owner to specify the modpack with a JSON config file and let clients download it during startup. Makes setting up and updating a custom modpack with friends much easier.
+This project allows a NeoForge server owner to specify the modpack with a JSON config file and let clients download it during startup. Makes setting up and updating a custom modpack with friends much easier.
+
+Currently supported Minecraft Version: `1.21.1`
 
 ## Server
 ### Install
