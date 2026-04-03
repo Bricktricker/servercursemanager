@@ -225,6 +225,11 @@ public class ClientSideHandler extends SideHandler {
 	public String getRemoteServer() {
 		return this.packConfig.get("client.remoteServer");
 	}
+	
+	public boolean requireValidCert() {
+	    Boolean validCert = this.packConfig.<Boolean>get("client.validCert");
+	    return validCert != null && validCert;
+	}
 
 	@Override
 	public void doCleanup() {

@@ -1,6 +1,7 @@
 package bricktricker.servercursemanager.server;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -17,11 +18,13 @@ import java.util.concurrent.TimeUnit;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.logging.log4j.util.TriConsumer;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonPrimitive;
 
 import bricktricker.servercursemanager.CopyOption;
 import bricktricker.servercursemanager.SideHandler;
@@ -307,6 +310,20 @@ public class ServerSideHandler extends SideHandler {
 
 	public int getPort() {
 		return this.packConfig.getAsJsonPrimitive("port").getAsInt();
+	}
+	
+	public Pair<File, File> getServerCerts() {
+	    JsonPrimitive certJson = this.packConfig.getAsJsonPrimitive("certificate");
+	    JsonPrimitive keyJson = this.packConfig.getAsJsonPrimitive("key");
+	    
+	    if(certJson == null || keyJson == null) {
+	        return null;
+	    }
+	    
+	    File cert = new File(certJson.getAsString());
+	    File key = new File(keyJson.getAsString());
+	    
+	    return Pair.of(cert,  key);
 	}
 
     public static record ModMapping(int projectID, int fileID, String fileName, String downloadUrl, String sha1) {

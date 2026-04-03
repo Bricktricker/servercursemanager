@@ -1,14 +1,24 @@
 package bricktricker.servercursemanager.server;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.math.BigInteger;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.security.cert.Certificate;
+import java.security.cert.CertificateException;
+import java.security.cert.CertificateExpiredException;
+import java.security.cert.CertificateFactory;
+import java.security.cert.CertificateNotYetValidException;
 import java.security.cert.X509Certificate;
 import java.security.interfaces.RSAPrivateKey;
 import java.time.LocalDateTime;
+import java.util.Collection;
+import java.util.Date;
 import java.util.TimeZone;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -45,24 +55,28 @@ public class RequestServer {
 		EventLoopGroup masterGroup = new NioEventLoopGroup(1, (Runnable r) -> newDaemonThread("ServerCurseManager Master - ", r));
 		EventLoopGroup slaveGroup = new NioEventLoopGroup(1, (Runnable r) -> newDaemonThread("ServerCurseManager Slave - ", r));
 		
-		// Generate a self signed cetificate for the server
+		// Generate self signed cert
+        var certPair = handler.getServerCerts();
+        if(certPair != null) {
+            checkCertificate(certPair.getLeft());
+        }
+		
 		KeyPair serverKeypair = generateKeypair();
-		
-		LocalDateTime beginValid = LocalDateTime.now(TimeZone.getTimeZone("UTC").toZoneId());
+        
+        LocalDateTime beginValid = LocalDateTime.now(TimeZone.getTimeZone("UTC").toZoneId());
         LocalDateTime stopValid = beginValid.plusMonths(12);
-		
+
         X500Principal issuer = new X500Principal("CN=ServerCurseManager");
         
         X509Certificate serverCert = new CertificateBuilder()
-		    .version(3)
-		    .serialNumber(new BigInteger(64, new SecureRandom()))
-		    .validity(beginValid, stopValid)
-		    .issuer(issuer)
-		    .subject(issuer)
-		    .publicKey(serverKeypair.getPublic())
-		    .basicConstrains(true, 0)
-		    .build((RSAPrivateKey)serverKeypair.getPrivate(), CertificateBuilder.SIG_Sha256WithRSAEncryption);
-		    
+            .version(3)
+            .serialNumber(new BigInteger(64, new SecureRandom()))
+            .validity(beginValid, stopValid)
+            .issuer(issuer)
+            .subject(issuer)
+            .publicKey(serverKeypair.getPublic())
+            .basicConstrains(true, 0)
+            .build((RSAPrivateKey)serverKeypair.getPrivate(), CertificateBuilder.SIG_Sha256WithRSAEncryption);
 
 		int port = handler.getPort();
 		final ServerBootstrap bootstrap = new ServerBootstrap()
@@ -84,8 +98,14 @@ public class RequestServer {
 				@Override
 				protected void initChannel(final SocketChannel ch) {
 				    try {
-                        SslContext sslContext = SslContextBuilder
-                                .forServer(serverKeypair.getPrivate(), serverCert)
+				        SslContextBuilder sslBuilder;
+				        if(certPair == null) {
+				            sslBuilder = SslContextBuilder.forServer(serverKeypair.getPrivate(), serverCert);
+				        }else {
+				            sslBuilder = SslContextBuilder.forServer(certPair.getLeft(), certPair.getRight());
+				        }
+				        
+                        SslContext sslContext = sslBuilder
                                 .trustManager(new MojangCertTrustManager())
                                 .clientAuth(ClientAuth.REQUIRE)
                                 .protocols("TLSv1.3")
@@ -122,5 +142,34 @@ public class RequestServer {
         }
         kpg.initialize(2048);
         return kpg.generateKeyPair();
+	}
+	
+	private static void checkCertificate(File file) {
+	    try (FileInputStream fis = new FileInputStream(file)) {
+	        CertificateFactory cf = CertificateFactory.getInstance("X.509");
+	        Collection<? extends Certificate> certs =  cf.generateCertificates(fis);
+	        
+	        certs
+    	        .stream()
+    	        .map(X509Certificate.class::cast)
+    	        .forEach(cert -> {
+    	            try {
+    	                cert.checkValidity();
+    	            }catch (CertificateExpiredException | CertificateNotYetValidException e) {
+    	               LOGGER.warn("Server certificate not valid", e);
+    	               return;
+    	            }
+    	            
+    	            Date now = new Date();
+    	            Date notAfter = cert.getNotAfter();
+    	            long daysLeft = (notAfter.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
+    	            if(daysLeft < 7) {
+    	                LOGGER.warn("Server certificate expires in {} days", daysLeft);
+    	            }
+    	        });
+
+        } catch (IOException | CertificateException e) {
+            LOGGER.catching(e);
+        }
 	}
 }

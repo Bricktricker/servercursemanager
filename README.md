@@ -6,7 +6,7 @@ Currently supported Minecraft Version: `1.21.1`
 
 ## Server
 ### Install
-Simply put the jar file into the `mods` folder of your MinecraftForge server. Then start the server once to generate the config files and folders.
+Simply put the jar file into the `mods` folder of your Minecraft server. Then start the server once to generate the config files and folders.
 
 ### Config
 Server Curse Manager adds two new folders to your MineraftForge server: `serverpack` and `servermods`. `Servermods` is managed by the program and stores all downloaded mods. The `serverpack` folder contains the configuration files for the Server Curse Manager.
@@ -17,14 +17,16 @@ After the first start you should have a `pack.json` file in your `serverpack` fo
 2. `mods`: This is an array that list all mods you want to load on the server and all clients. Every mod is a JSON object with at least 2 values: 
 	1. `source`:  The source of the mod, this can either be `curse` to download the mod from [curseforge.com](https://www.curseforge.com/) or `local` to load a local jar file.
 	2. If the source is `curse`, you need to specify two more entries: `projectID` (The curseforge project ID of the mod) and `fileID` (The file ID of the specific file).
-	3. If the source is `local` you need a `mod` entry specifying  the path to the jar file relative to the MinecraftForge server root folder.
+	3. If the source is `local` you need a `mod` entry specifying  the path to the jar file relative to the Minecraft server root folder.
 	4. You can specify the side where the mod should be loaded with the key `side`. Possible values are: `client`, `server`, `both` (default).
 	5. You can also specify aditional entries like the mod name to better organize your config file. Other entries are ignored by Server Curse Manager.
 3. `additional`:  Contains additonal files or folders you want to sync to the client, this can be config files, resource packs or client-only mods. Every file or folder you want to sync is a JSON object with two entries:
-	1. `file`: The path to the file or folder you want to sync, relative to the  MinecraftForge root folder.
+	1. `file`: The path to the file or folder you want to sync, relative to the  Minecraft root folder.
 	2. `target`: Where the file or folder should be placed on the client relative to the current game folder (This is either the `.minecraft` folder or the folder specified fo the current profile).
 4. `copyOption`: Can either be `overwrite` or `keep`, defaults to `keep`. This specifies how to deal with additional files, if they are already present on the client. You can also specify this for individual files.
-5. `clientPacks`: Allos you to create additional client only modpacks. User can enable them in the "Serverpack utility mod" config screen.
+5. `clientPacks`: Allows you to create additional client only modpacks. User can enable them in the "Serverpack utility mod" config screen.
+6. `certificate`: Optional: A path to a valid X509 certificate that the server should use to authenticate the TLS connection. If this value is not set, then a self signed certificate is generated.
+7. `key`: Optional: A path to the key for the certificate from the `certificate` option.
 
 Make sure to restart the server after chainging the config file.
 
@@ -90,6 +92,16 @@ Server Curse Manager uses the newly added key pairs every Mojang account has to 
 Simply put the jar file into the `mods` folder. Then start Minecraft once to generate the config file and needed folders. Make sure you have migrated your Mojang account to a Microsoft account.
 
 ### Config
-The only important config file is the the `serverpack/config.toml` file.  Here you need to specify the server ip or adress and port of the target MinecraftForge server, right next to the `remoteServer`. You should specify the server in the format `server:port`, e.g. `localhost:8080` or `my.server.com:4148`.
-The server alllows overwriting and creating additional files on the client. If you, as the client, don't want a specific file to be created, create an empty file at the same place with the same name, but with an .bak extension. This tells the SCM to skip creating or updating the file.
+The only important config file is the the `serverpack/config.toml` file.  Here you need to specify the server ip or adress and port of the target Minecraft server, right next to the `remoteServer`. You should specify the server in the format `server:port`, e.g. `localhost:8080` or `my.server.com:4148`.
 
+If you want to enforce that a valid certificate is used by the server, set the `validCert` option to `true`. The client now only accepts certificates from the server that are signed by a CA in the local trust store.
+
+The server allows overwriting and creating additional files on the client. If you, as the client, don't want a specific file to be created, create an empty file at the same place with the same name, but with an .bak extension. This tells the SCM to skip creating or updating the file.
+
+### Example client config:
+`serverpack/config.toml`:
+```toml
+[client]
+	remoteServer = "my.server.com:4148"
+	validCert = false
+```

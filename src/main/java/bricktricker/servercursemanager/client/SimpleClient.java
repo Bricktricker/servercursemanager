@@ -97,13 +97,18 @@ public class SimpleClient {
 					    try {
                             SslContext sslContext = SslContextBuilder.forClient()
                                     .keyManager(clientKeypair.privateKey(), clientCert)
-                                    .trustManager(InsecureTrustManagerFactory.INSTANCE)
+                                    .trustManager(clientSideHandler.requireValidCert() ? null : InsecureTrustManagerFactory.INSTANCE)
                                     .clientAuth(ClientAuth.REQUIRE)
                                     .protocols("TLSv1.3")
                                     .build();
-                            final SslHandler sslHandler = sslContext.newHandler(ch.alloc());
+                            
+                            final SslHandler sslHandler = sslContext.newHandler(ch.alloc(), uri.getHost(), inetPort);
                             final SSLParameters sslParameters = sslHandler.engine().getSSLParameters();
                             sslParameters.setServerNames(null);
+                            if(clientSideHandler.requireValidCert()) {
+                                sslParameters.setEndpointIdentificationAlgorithm("HTTPS");
+                                LOGGER.debug("Enabling certificate validation");
+                            }
                             sslHandler.engine().setSSLParameters(sslParameters);
                             ch.pipeline().addLast("ssl", sslHandler);
                         } catch (SSLException e) {
