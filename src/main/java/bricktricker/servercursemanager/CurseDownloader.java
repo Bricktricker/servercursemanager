@@ -28,7 +28,7 @@ public class CurseDownloader {
 
     public static CompletableFuture<ModMapping> downloadMod(int projectID, int fileID, Path targetDir, Executor executor) {
         
-        String metaDataURL = String.format("https://api.curse.tools/v1/cf/mods/%s/files/%s/", projectID, fileID);
+        String metaDataURL = String.format("https://api.curse.tools/v1/mods/%s/files/%s/", projectID, fileID);
         URI url;
         try {
             url = new URI(metaDataURL);
@@ -47,7 +47,6 @@ public class CurseDownloader {
         var reqFuture = httpClient.sendAsync(httpRequest, BodyHandlers.ofString())
                 .thenApply(r -> JsonParser.parseString(r.body()))
                 .thenCompose(elem -> {
-                    // TODO: Check the used thread
 
                     String downloadURL = elem.getAsJsonObject()
                             .getAsJsonObject("data")
@@ -76,7 +75,8 @@ public class CurseDownloader {
 
                     return httpClient.sendAsync(fileReq,
                             BodyHandlers.ofFile(target, StandardOpenOption.CREATE, StandardOpenOption.WRITE));
-                }).thenApply(response -> {
+                })
+                .thenApply(response -> {
                     Path target = response.body();
                     String sha1Hash = Utils.computeSha1Str(target);
 
