@@ -1,7 +1,6 @@
 package bricktricker.servercursemanager.client;
 
 import java.security.SecureRandom;
-import java.security.cert.CertificateEncodingException;
 import java.security.cert.X509Certificate;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -12,7 +11,6 @@ import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.UnknownHostException;
 import java.nio.file.Path;
-import java.util.Base64;
 import java.util.TimeZone;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -77,12 +75,6 @@ public class SimpleClient {
 		var clientKeypair = ProfileKeyPairBasedSecurityManager.getProfileKeyPair();
 		
 		var clientCert = mojangToX509(clientKeypair, ProfileKeyPairBasedSecurityManager.getInstance().getPlayerUUID());
-		
-		try {
-            LOGGER.debug("Used X509 Cert: {}", Base64.getEncoder().encodeToString(clientCert.getEncoded()));
-        } catch (CertificateEncodingException e) {
-            LOGGER.catching(e);
-        }
 
 		final ChannelFuture remoteConnect = new Bootstrap()
 		        .group(new NioEventLoopGroup(1))
@@ -152,7 +144,7 @@ public class SimpleClient {
 	// converts the mojang certificate into an (invalid) X509 certificate
 	private static X509Certificate mojangToX509(ProfileKeyPair playerKeys, UUID playerUUid) {
 	    
-	    LocalDateTime beginValid = LocalDateTime.now(TimeZone.getTimeZone("UTC").toZoneId());
+	    LocalDateTime beginValid = LocalDateTime.now(TimeZone.getTimeZone("UTC").toZoneId()).minusSeconds(10);
         LocalDateTime stopValid = LocalDateTime.ofInstant(playerKeys.publicKeyData().expiresAt(), ZoneOffset.UTC);
         
         long stopValidMillis = playerKeys.publicKeyData().expiresAt().toEpochMilli();
