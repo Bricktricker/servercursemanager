@@ -144,9 +144,6 @@ public class ClientSideHandler extends SideHandler {
 				Files.createDirectories(destination.getParent());
 				if(copyOption.writeFile(destination)) {
 					Files.copy(fileEntry, destination, StandardCopyOption.REPLACE_EXISTING);
-					LOGGER.debug("Copied additional file to {}", destination.toString());
-				}else {
-					LOGGER.debug("Skipped writing additional file {}", destination.toString());
 				}
 			}
 			

@@ -204,7 +204,6 @@ public class ServerSideHandler extends SideHandler {
 				filesToCopy.add(targetStr);
 				
 				String pathInZip = SideHandler.ADDITIONAL + "/" + targetStr;
-				LOGGER.debug("Adding additional file {} as target {}, stored as {} to modpack", p.toString(), targetStr, pathInZip);
 				ZipEntry entry = Utils.getStableEntry(pathInZip);
 				try {
 					zos.putNextEntry(entry);
